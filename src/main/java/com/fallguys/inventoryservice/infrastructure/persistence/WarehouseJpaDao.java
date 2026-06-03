@@ -1,0 +1,44 @@
+package com.fallguys.inventoryservice.infrastructure.persistence;
+
+import java.util.List;
+
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.fallguys.inventoryservice.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.domain.query.WarehouseSummary;
+
+public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
+
+    /**
+     * 조건부 필터로 창고를 검색해 읽기 모델(WarehouseSummary)로 투영한다.
+     *
+     * 조인: BranchLocation을 LEFT JOIN하여 소속 지점명을 가져온다(HQ 유형은 branchId가 null이라 지점명 null).
+     * 필터: 각 파라미터가 null이면 해당 조건을 건너뛴다(동적 조회).
+     *   - keyword: 창고명/코드 부분 일치(대소문자 무시). 와일드카드(%)와 소문자화는 호출부에서 적용한
+     *              소문자 LIKE 패턴으로 들어온다. (PostgreSQL의 untyped-null → bytea 추론을 피하려
+     *              CONCAT/LOWER(param) 대신 타입이 명확한 String 파라미터로 비교한다.)
+     *   - type:    유형 일치
+     *   - active:  활성 상태 일치(ALL 조회 시 null로 들어와 조건 제외)
+     * 정렬: Sort 파라미터로 위임(허용 속성은 호출부에서 화이트리스트 검증됨).
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.domain.query.WarehouseSummary(
+                w.id, w.code, w.name, w.type, b.name, w.active, w.createdAt, w.updatedAt)
+            FROM WarehouseEntity w
+            LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
+            WHERE (:keyword IS NULL
+                   OR LOWER(w.code) LIKE :keyword
+                   OR LOWER(w.name) LIKE :keyword)
+              AND (:type IS NULL OR w.type = :type)
+              AND (:active IS NULL OR w.active = :active)
+            """)
+    List<WarehouseSummary> search(
+            @Param("keyword") String keyword,
+            @Param("type") WarehouseType type,
+            @Param("active") Boolean active,
+            Sort sort
+    );
+}
