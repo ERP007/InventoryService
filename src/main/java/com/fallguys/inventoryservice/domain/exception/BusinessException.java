@@ -2,6 +2,10 @@ package com.fallguys.inventoryservice.domain.exception;
 
 import lombok.Getter;
 
+/**
+ * 도메인 비즈니스 예외의 베이스. 프레임워크에 의존하지 않으며 code + message만 보유한다.
+ * HTTP 변환은 controller 계층의 GlobalExceptionHandler가 전담한다.
+ */
 @Getter
 public abstract class BusinessException extends RuntimeException {
 
@@ -16,5 +20,4 @@ public abstract class BusinessException extends RuntimeException {
         super(message, cause);
         this.code = code;
     }
-
 }
