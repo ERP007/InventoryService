@@ -39,3 +39,4 @@ out/
 CLAUDE.md
 
 src/main/resources/application.yaml
+.env
