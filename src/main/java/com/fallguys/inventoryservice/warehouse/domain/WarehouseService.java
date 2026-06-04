@@ -4,12 +4,14 @@ import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationReposit
 
 import java.util.List;
 
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
@@ -70,5 +72,23 @@ public class WarehouseService {
 
         return warehouseRepository.findSummaryById(id)
                 .orElseThrow(() -> new IllegalStateException("저장된 창고를 조회하지 못했습니다: " + id));
+    }
+
+    /**
+     * 수정 모달 프리필을 위해 창고 단건을 상세 조회한다(소속 지점명·주소·version 포함).
+     *
+     * 흐름:
+     * 1) 식별자로 읽기 모델(WarehouseSummaryForEdit)을 조회한다.
+     * 2) 없으면 존재를 은닉하여 404로 막는다("없음"과 "소속 외"를 구분하지 않는다).
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음.
+     *
+     * 예외:
+     * - 창고 없음/소속 외: WarehouseNotFoundException (404)
+     */
+    @Transactional(readOnly = true)
+    public WarehouseSummaryForEdit getById(Long id) {
+        return warehouseRepository.findForEditById(id)
+                .orElseThrow(() -> new WarehouseNotFoundException(id));
     }
 }

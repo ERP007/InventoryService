@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 /**
  * [DIP] 창고 영속성 추상화. 도메인이 정의하고 infrastructure가 구현한다.
@@ -24,4 +25,7 @@ public interface WarehouseRepository {
 
     /** 식별자로 창고 읽기 모델(소속 지점명 포함)을 조회한다. 없으면 empty. */
     Optional<WarehouseSummary> findSummaryById(Long id);
+
+    /** 식별자로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
+    Optional<WarehouseSummaryForEdit> findForEditById(Long id);
 }
