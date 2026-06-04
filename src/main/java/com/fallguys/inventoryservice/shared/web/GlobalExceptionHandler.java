@@ -22,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import com.fallguys.inventoryservice.shared.exception.BusinessException;
 import com.fallguys.inventoryservice.shared.exception.ConflictException;
+import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.shared.exception.CommonErrorCode;
 import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
@@ -56,6 +57,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
         log.warn("Not found [{}]: {}", ex.getCode(), ex.getMessage());
         return build(HttpStatus.NOT_FOUND, ex.getCode(), ex.getMessage());
+    }
+
+    /** 인가 실패(권한 없음): 403. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */
+    @ExceptionHandler(ForbiddenException.class)
+    public ProblemDetail handleForbidden(ForbiddenException ex) {
+        log.warn("Forbidden [{}]: {}", ex.getCode(), ex.getMessage());
+        return build(HttpStatus.FORBIDDEN, ex.getCode(), ex.getMessage());
     }
 
     /** 그 외 도메인 비즈니스 예외: 400. WARN. */

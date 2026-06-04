@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.warehouse.controller;
 
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -21,10 +23,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.branchlocation.domain.BranchLocation;
 import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationRepository;
 import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
+import com.fallguys.inventoryservice.shared.model.UserRole;
+import com.fallguys.inventoryservice.shared.security.SecurityConfig;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
@@ -37,17 +42,25 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 @WebMvcTest(WarehouseController.class)
-@Import({GlobalExceptionHandler.class, WarehouseControllerTest.StubConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, WarehouseControllerTest.StubConfig.class})
 class WarehouseControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    // ---- GET (조회) ----
+    /** 지정한 Role을 erp-client 클라이언트 롤로 담은 JWT 인증을 요청에 주입한다. */
+    private static RequestPostProcessor roleJwt(UserRole role) {
+        return jwt().jwt(token -> token
+                .claim("preferred_username", "tester")
+                .claim("resource_access", Map.of("erp-client", Map.of("roles", List.of(role.name())))));
+    }
+
+    // ---- GET (조회) : 전체 Role 허용 ----
 
     @Test
     void 정상조회는_200과_content_totalElements_sort를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses").param("type", "HQ"))
+        // 목록은 권한 차등이 없어 가장 낮은 BRANCH_STAFF로도 조회된다.
+        mockMvc.perform(get("/inventory/warehouses").param("type", "HQ").with(roleJwt(UserRole.BRANCH_STAFF)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.sort").value("code,asc"))
@@ -59,7 +72,7 @@ class WarehouseControllerTest {
 
     @Test
     void 허용되지_않는_type은_400과_INVALID_PARAMETER_details를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses").param("type", "FACTORY"))
+        mockMvc.perform(get("/inventory/warehouses").param("type", "FACTORY").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.timestamp").exists())
@@ -70,17 +83,24 @@ class WarehouseControllerTest {
 
     @Test
     void 허용되지_않는_sort도_400과_details를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses").param("sort", "address,asc"))
+        mockMvc.perform(get("/inventory/warehouses").param("sort", "address,asc").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.details[0].field").value("sort"));
     }
 
-    // ---- POST (등록) ----
+    @Test
+    void 인증토큰이_없으면_401을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---- POST (등록) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 정상등록은_201과_생성된_창고를_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"WH-SE-002","name":"서울 2창고","type":"DEALER","branchId":3,"address":"서울 강남구 테헤란로 521"}
@@ -94,8 +114,32 @@ class WarehouseControllerTest {
     }
 
     @Test
+    void 등록은_HQ_MANAGER도_허용된다() throws Exception {
+        mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.HQ_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"WH-SE-002","name":"서울 2창고","type":"DEALER","branchId":3,"address":"서울 강남구 테헤란로 521"}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void 등록은_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.BRANCH_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"WH-SE-002","name":"서울 2창고","type":"DEALER","branchId":3,"address":"서울 강남구 테헤란로 521"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
     void 필수값_누락은_400과_INVALID_PARAMETER를_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 2창고","type":"DEALER","branchId":3}
@@ -108,6 +152,7 @@ class WarehouseControllerTest {
     @Test
     void 허용되지_않는_type은_400과_INVALID_PARAMETER_allowed를_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"WH-SE-002","name":"서울 2창고","type":"FACTORY","branchId":3}
@@ -121,6 +166,7 @@ class WarehouseControllerTest {
     @Test
     void DEALER인데_branchId가_없으면_400과_WAREHOUSE_BRANCH_RULE을_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"WH-SE-002","name":"서울 2창고","type":"DEALER"}
@@ -132,6 +178,7 @@ class WarehouseControllerTest {
     @Test
     void 존재하지_않는_branchId는_400과_BRANCH_NOT_FOUND를_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"WH-SE-002","name":"서울 2창고","type":"DEALER","branchId":999}
@@ -143,6 +190,7 @@ class WarehouseControllerTest {
     @Test
     void 코드가_중복이면_409와_WAREHOUSE_CODE_DUPLICATE를_반환한다() throws Exception {
         mockMvc.perform(post("/inventory/warehouses")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"DUP-001","name":"서울 2창고","type":"DEALER","branchId":3}
@@ -151,11 +199,11 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_CODE_DUPLICATE"));
     }
 
-    // ---- GET /{id} (단건 조회) ----
+    // ---- GET /{id} (단건 조회) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 단건조회는_200과_전체필드_branchId_address_version을_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/2"))
+        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.code").value("WH-SE-001"))
@@ -167,8 +215,15 @@ class WarehouseControllerTest {
     }
 
     @Test
+    void 단건조회는_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
     void 없는_창고는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/999"))
+        mockMvc.perform(get("/inventory/warehouses/999").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"))
                 .andExpect(jsonPath("$.timestamp").exists());
@@ -176,17 +231,18 @@ class WarehouseControllerTest {
 
     @Test
     void id가_숫자가_아니면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/abc"))
+        mockMvc.perform(get("/inventory/warehouses/abc").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.details[0].field").value("id"));
     }
 
-    // ---- PUT /{id} (수정) ----
+    // ---- PUT /{id} (수정) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 정상수정은_200과_갱신된_창고_version증가를_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 1창고 (강남)","type":"DEALER","branchId":3,"address":"서울 강남구 테헤란로 521","version":5}
@@ -200,8 +256,21 @@ class WarehouseControllerTest {
     }
 
     @Test
+    void 수정은_권한없는_BRANCH_MANAGER면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"서울 1창고 (강남)","type":"DEALER","branchId":3,"address":"서울 강남구 테헤란로 521","version":5}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
     void code를_포함하면_400과_WAREHOUSE_CODE_IMMUTABLE을_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"WH-SE-001","name":"서울 1창고","type":"DEALER","branchId":3,"version":5}
@@ -213,6 +282,7 @@ class WarehouseControllerTest {
     @Test
     void HQ인데_branchId가_있으면_400과_WAREHOUSE_BRANCH_RULE을_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"본사","type":"HQ","branchId":3,"version":5}
@@ -224,6 +294,7 @@ class WarehouseControllerTest {
     @Test
     void 수정시_존재하지_않는_branchId는_400과_BRANCH_NOT_FOUND를_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 1창고","type":"DEALER","branchId":999,"version":5}
@@ -235,6 +306,7 @@ class WarehouseControllerTest {
     @Test
     void version이_없으면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 1창고","type":"DEALER","branchId":3}
@@ -247,6 +319,7 @@ class WarehouseControllerTest {
     @Test
     void 없는_창고_수정은_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/999")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 1창고","type":"DEALER","branchId":3,"version":5}
@@ -258,6 +331,7 @@ class WarehouseControllerTest {
     @Test
     void version이_불일치하면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
         mockMvc.perform(put("/inventory/warehouses/2")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"서울 1창고","type":"DEALER","branchId":3,"version":4}
@@ -266,11 +340,12 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("OPTIMISTIC_LOCK_CONFLICT"));
     }
 
-    // ---- PATCH /{id}/active (활성 전환) ----
+    // ---- PATCH /{id}/active (활성 전환) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 활성전환은_200과_변경된_active_version증가를_반환한다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active":false,"version":5}
@@ -283,8 +358,21 @@ class WarehouseControllerTest {
     }
 
     @Test
+    void 활성전환은_권한없는_HQ_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.HQ_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false,"version":5}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
     void 같은_값으로의_전환은_멱등_no_op_200이며_version이_그대로다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active":true,"version":5}
@@ -297,6 +385,7 @@ class WarehouseControllerTest {
     @Test
     void active가_없으면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"version":5}
@@ -309,6 +398,7 @@ class WarehouseControllerTest {
     @Test
     void active_형식이_틀리면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active":"네","version":5}
@@ -320,6 +410,7 @@ class WarehouseControllerTest {
     @Test
     void 없는_창고_전환은_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/999/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active":false,"version":5}
@@ -331,6 +422,7 @@ class WarehouseControllerTest {
     @Test
     void 전환시_version이_불일치하면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
         mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active":false,"version":4}

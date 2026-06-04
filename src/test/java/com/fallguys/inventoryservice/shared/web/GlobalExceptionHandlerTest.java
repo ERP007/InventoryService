@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
 import com.fallguys.inventoryservice.shared.exception.BusinessException;
+import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 
@@ -39,6 +40,15 @@ class GlobalExceptionHandlerTest {
         assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(problemDetail.getProperties().get("errorCode")).isEqualTo("INV-XYZ");
         assertThat(problemDetail.getDetail()).isEqualTo("도메인 규칙 위반");
+    }
+
+    @Test
+    void 인가실패는_403과_FORBIDDEN으로_매핑된다() {
+        ProblemDetail problemDetail = handler.handleForbidden(new ForbiddenException());
+
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(problemDetail.getProperties().get("errorCode")).isEqualTo("FORBIDDEN");
+        assertThat(problemDetail.getProperties()).containsKey("timestamp");
     }
 
     @Test
