@@ -10,6 +10,7 @@ import lombok.Getter;
 public enum CommonErrorCode {
 
     INVALID_PARAMETER("INVALID_PARAMETER", "요청 파라미터가 올바르지 않습니다."),
+    OPTIMISTIC_LOCK_CONFLICT("OPTIMISTIC_LOCK_CONFLICT", "다른 사용자가 먼저 수정했습니다. 최신 상태로 재조회 후 다시 시도하세요."),
     INTERNAL_ERROR("INTERNAL_ERROR", "서버 내부 오류가 발생했습니다.");
 
     private final String code;
