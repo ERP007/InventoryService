@@ -9,8 +9,10 @@ import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCreateReq
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseDetailResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseListResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseResponse;
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseUpdateRequest;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -87,6 +89,28 @@ public class WarehouseController {
             @PathVariable Long id
     ) {
         WarehouseSummaryForEdit detail = warehouseService.getById(id);
+        return WarehouseDetailResponse.from(detail);
+    }
+
+    /**
+     * 창고의 변경 가능 항목을 수정한다. ADMIN·HQ_MANAGER만 호출 가능(인가는 게이트웨이가 판단).
+     * code 포함 시 400(WAREHOUSE_CODE_IMMUTABLE), 값/정합 오류는 400, 없으면 404(WAREHOUSE_NOT_FOUND),
+     * version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT)로 매핑된다.
+     */
+    @Operation(
+            summary = "창고 수정",
+            description = "창고명·유형·소속 지점·주소를 수정한다. code는 변경 불가이며 version으로 낙관적 락을 검증한다."
+    )
+    @PutMapping("/{id}")
+    public WarehouseDetailResponse update(
+            @Parameter(description = "창고 내부 PK")
+            @PathVariable Long id,
+            @Valid @RequestBody WarehouseUpdateRequest request
+    ) {
+        UpdateWarehouseCommand command = UpdateWarehouseCommand.of(
+                request.code(), request.name(), request.type(),
+                request.branchId(), request.address(), request.version());
+        WarehouseSummaryForEdit detail = warehouseService.update(id, command);
         return WarehouseDetailResponse.from(detail);
     }
 }
