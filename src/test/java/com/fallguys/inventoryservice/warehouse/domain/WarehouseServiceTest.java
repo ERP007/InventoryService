@@ -14,7 +14,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseBranchRuleException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
@@ -134,6 +136,46 @@ class WarehouseServiceTest {
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
+    // ---- update ----
+
+    @Test
+    void update는_정합_검증_후_영속성에_위임하고_결과를_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.updatedResult = new WarehouseSummaryForEdit(
+                2L, "WH-SE-001", "서울 1창고 (강남)", WarehouseType.DEALER, 3L, "서울 강남지점", "새 주소",
+                true, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:31:00Z"), 6L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.update(2L,
+                new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 3L, "새 주소", 5L));
+
+        assertThat(result.version()).isEqualTo(6L);
+        assertThat(repository.updateIdArg).isEqualTo(2L);
+        assertThat(repository.updateCommandArg.name()).isEqualTo("서울 1창고 (강남)");
+    }
+
+    @Test
+    void update는_유형_정합_위반이면_WarehouseBranchRuleException을_던지고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.update(2L,
+                new UpdateWarehouseCommand("본사", WarehouseType.HQ, 3L, null, 5L)))
+                .isInstanceOf(WarehouseBranchRuleException.class);
+        assertThat(repository.updateIdArg).isNull();
+    }
+
+    @Test
+    void update는_소속지점이_없으면_BranchNotFoundException을_던지고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(false));
+
+        assertThatThrownBy(() -> service.update(2L,
+                new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 99L, null, 5L)))
+                .isInstanceOf(BranchNotFoundException.class);
+        assertThat(repository.updateIdArg).isNull();
+    }
+
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
         private WarehouseSearchQuery received;
@@ -141,6 +183,9 @@ class WarehouseServiceTest {
         private Warehouse savedWarehouse;
         private WarehouseSummary summaryAfterSave;
         private WarehouseSummaryForEdit summaryForEdit;
+        private WarehouseSummaryForEdit updatedResult;
+        private Long updateIdArg;
+        private UpdateWarehouseCommand updateCommandArg;
 
         private StubWarehouseRepository(List<WarehouseSummary> searchResult) {
             this.searchResult = searchResult;
@@ -171,6 +216,13 @@ class WarehouseServiceTest {
         @Override
         public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
             return Optional.ofNullable(summaryForEdit);
+        }
+
+        @Override
+        public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
+            this.updateIdArg = id;
+            this.updateCommandArg = command;
+            return updatedResult;
         }
     }
 

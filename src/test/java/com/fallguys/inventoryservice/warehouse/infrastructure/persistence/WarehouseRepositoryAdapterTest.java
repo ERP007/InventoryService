@@ -1,6 +1,7 @@
 package com.fallguys.inventoryservice.warehouse.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,9 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
+import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
@@ -115,6 +119,32 @@ class WarehouseRepositoryAdapterTest {
     @Test
     void findForEditById는_없는_id면_empty를_반환한다() {
         assertThat(adapter.findForEditById(999L)).isEmpty();
+    }
+
+    @Test
+    void update는_변경항목을_수정하고_version과_updatedAt을_올린다() {
+        WarehouseSummaryForEdit result = adapter.update(2L,
+                new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 10L, "새 주소", 0L));
+
+        assertThat(result.name()).isEqualTo("서울 1창고 (강남)");
+        assertThat(result.address()).isEqualTo("새 주소");
+        assertThat(result.branchName()).isEqualTo("서울 강남지점");
+        assertThat(result.version()).isEqualTo(1L);
+        assertThat(result.updatedAt()).isAfter(result.createdAt());
+    }
+
+    @Test
+    void update는_version이_불일치하면_OptimisticLockConflictException을_던진다() {
+        assertThatThrownBy(() -> adapter.update(2L,
+                new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 10L, null, 99L)))
+                .isInstanceOf(OptimisticLockConflictException.class);
+    }
+
+    @Test
+    void update는_없는_창고면_WarehouseNotFoundException을_던진다() {
+        assertThatThrownBy(() -> adapter.update(999L,
+                new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 10L, null, 0L)))
+                .isInstanceOf(WarehouseNotFoundException.class);
     }
 
     private void insertBranch(long id, String name) {
