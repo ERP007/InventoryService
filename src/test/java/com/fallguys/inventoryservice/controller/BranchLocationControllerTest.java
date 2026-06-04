@@ -89,6 +89,11 @@ class BranchLocationControllerTest {
                 }
 
                 @Override
+                public boolean existsById(Long id) {
+                    return false;
+                }
+
+                @Override
                 public BranchLocation save(BranchLocation branchLocation) {
                     return BranchLocation.of(9L, branchLocation.getName());
                 }

@@ -78,6 +78,11 @@ class BranchLocationServiceTest {
         }
 
         @Override
+        public boolean existsById(Long id) {
+            return false;
+        }
+
+        @Override
         public BranchLocation save(BranchLocation branchLocation) {
             this.savedArg = branchLocation;
             return BranchLocation.of(assignedId, branchLocation.getName());
