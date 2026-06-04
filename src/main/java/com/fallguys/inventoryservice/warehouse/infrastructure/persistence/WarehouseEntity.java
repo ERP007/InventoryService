@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.infrastructure.persistence;
 import java.time.Instant;
 
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 
 import jakarta.persistence.Column;
@@ -13,6 +14,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.AccessLevel;
@@ -78,6 +80,17 @@ public class WarehouseEntity {
                 warehouse.getBranchId(), warehouse.getAddress(), warehouse.isActive());
     }
 
+    /**
+     * 변경 가능 항목을 수정한다(code·active·createdAt은 불변, version은 JPA @Version이 관리).
+     * 유형↔branchId 정합은 도메인에서 이미 검증된 상태로 들어온다.
+     */
+    public void update(UpdateWarehouseCommand command) {
+        this.name = command.name();
+        this.type = command.type();
+        this.branchId = command.branchId();
+        this.address = command.address();
+    }
+
     /** 최초 영속 시 생성·수정 시각을 현재 시각으로 채운다(도메인에 시계 의존을 두지 않기 위함). */
     @PrePersist
     void onCreate() {
@@ -88,5 +101,11 @@ public class WarehouseEntity {
         if (updatedAt == null) {
             updatedAt = now;
         }
+    }
+
+    /** 수정 영속 시 수정 시각을 갱신한다. */
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 }
