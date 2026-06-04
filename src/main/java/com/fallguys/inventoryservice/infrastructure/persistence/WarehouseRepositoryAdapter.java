@@ -2,10 +2,12 @@ package com.fallguys.inventoryservice.infrastructure.persistence;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import com.fallguys.inventoryservice.domain.Warehouse;
 import com.fallguys.inventoryservice.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.domain.query.SortDirection;
 import com.fallguys.inventoryservice.domain.query.WarehouseSearchQuery;
@@ -24,6 +26,22 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     public List<WarehouseSummary> search(WarehouseSearchQuery query) {
         Sort sort = toSpringSort(query.sort());
         return jpaDao.search(toLikePattern(query.keyword()), query.type(), query.status().toActiveFilter(), sort);
+    }
+
+    @Override
+    public boolean existsByCode(String code) {
+        return jpaDao.existsByCode(code);
+    }
+
+    @Override
+    public Long save(Warehouse warehouse) {
+        WarehouseEntity saved = jpaDao.save(WarehouseEntity.from(warehouse));
+        return saved.getId();
+    }
+
+    @Override
+    public Optional<WarehouseSummary> findSummaryById(Long id) {
+        return jpaDao.findSummaryById(id);
     }
 
     /** 부분 일치 LIKE 패턴으로 변환한다(소문자화 + 양끝 와일드카드). 검색어가 없으면 null. */

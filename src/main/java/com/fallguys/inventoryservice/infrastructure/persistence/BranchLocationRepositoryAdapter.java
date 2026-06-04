@@ -22,6 +22,11 @@ public class BranchLocationRepositoryAdapter implements BranchLocationRepository
     }
 
     @Override
+    public boolean existsById(Long id) {
+        return jpaDao.existsById(id);
+    }
+
+    @Override
     public BranchLocation save(BranchLocation branchLocation) {
         BranchLocationEntity saved = jpaDao.save(BranchLocationEntity.from(branchLocation));
         return saved.toDomain();

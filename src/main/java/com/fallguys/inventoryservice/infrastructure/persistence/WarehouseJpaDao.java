@@ -1,6 +1,7 @@
 package com.fallguys.inventoryservice.infrastructure.persistence;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +42,21 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
             @Param("active") Boolean active,
             Sort sort
     );
+
+    /** 창고 코드 존재 여부(등록 전 중복 검사). */
+    boolean existsByCode(String code);
+
+    /**
+     * 식별자로 창고를 읽기 모델(WarehouseSummary)로 투영한다(등록 직후 응답 구성용).
+     *
+     * 조인: BranchLocation을 LEFT JOIN하여 소속 지점명을 가져온다(HQ는 branchId가 null이라 지점명 null).
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.domain.query.WarehouseSummary(
+                w.id, w.code, w.name, w.type, b.name, w.active, w.createdAt, w.updatedAt)
+            FROM WarehouseEntity w
+            LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
+            WHERE w.id = :id
+            """)
+    Optional<WarehouseSummary> findSummaryById(@Param("id") Long id);
 }
