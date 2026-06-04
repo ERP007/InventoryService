@@ -1,8 +1,11 @@
 package com.fallguys.inventoryservice.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +67,16 @@ class BranchLocationControllerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
+    @Test
+    void 목록조회는_200과_content_배열을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/branch-locations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].name").value("서울 강남지점"))
+                .andExpect(jsonPath("$.content[1].id").value(2))
+                .andExpect(jsonPath("$.content[1].name").value("서울 송파지점"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -78,6 +91,13 @@ class BranchLocationControllerTest {
                 @Override
                 public BranchLocation save(BranchLocation branchLocation) {
                     return BranchLocation.of(9L, branchLocation.getName());
+                }
+
+                @Override
+                public List<BranchLocation> findAll() {
+                    return List.of(
+                            BranchLocation.of(1L, "서울 강남지점"),
+                            BranchLocation.of(2L, "서울 송파지점"));
                 }
             };
             return new BranchLocationService(repository);

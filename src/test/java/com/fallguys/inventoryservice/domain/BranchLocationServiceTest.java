@@ -3,6 +3,8 @@ package com.fallguys.inventoryservice.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.domain.command.CreateBranchLocationCommand;
@@ -36,11 +38,33 @@ class BranchLocationServiceTest {
         assertThat(repository.savedArg).isNull();
     }
 
+    @Test
+    void findAll은_레포지토리의_전체_지점목록을_그대로_반환한다() {
+        StubBranchLocationRepository repository = new StubBranchLocationRepository(false, 0L);
+        repository.findAllResult = List.of(
+                BranchLocation.of(1L, "서울 강남지점"),
+                BranchLocation.of(2L, "서울 송파지점"));
+        BranchLocationService service = new BranchLocationService(repository);
+
+        List<BranchLocation> result = service.findAll();
+
+        assertThat(result).extracting(BranchLocation::getName)
+                .containsExactly("서울 강남지점", "서울 송파지점");
+    }
+
+    @Test
+    void findAll은_지점이_없으면_빈_목록을_반환한다() {
+        BranchLocationService service = new BranchLocationService(new StubBranchLocationRepository(false, 0L));
+
+        assertThat(service.findAll()).isEmpty();
+    }
+
     private static final class StubBranchLocationRepository implements BranchLocationRepository {
         private final boolean exists;
         private final long assignedId;
         private String existsByNameArg;
         private BranchLocation savedArg;
+        private List<BranchLocation> findAllResult = List.of();
 
         private StubBranchLocationRepository(boolean exists, long assignedId) {
             this.exists = exists;
@@ -57,6 +81,11 @@ class BranchLocationServiceTest {
         public BranchLocation save(BranchLocation branchLocation) {
             this.savedArg = branchLocation;
             return BranchLocation.of(assignedId, branchLocation.getName());
+        }
+
+        @Override
+        public List<BranchLocation> findAll() {
+            return findAllResult;
         }
     }
 }
