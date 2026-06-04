@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import com.fallguys.inventoryservice.domain.exception.BranchLocationNameDuplicateException;
 import com.fallguys.inventoryservice.domain.exception.BusinessException;
+import com.fallguys.inventoryservice.domain.exception.ConflictException;
 import com.fallguys.inventoryservice.domain.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.domain.exception.InventoryErrorCode;
 import com.fallguys.inventoryservice.domain.exception.ParameterViolation;
@@ -40,9 +40,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problemDetail;
     }
 
-    /** 지점명 중복: 409. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */
-    @ExceptionHandler(BranchLocationNameDuplicateException.class)
-    public ProblemDetail handleBranchLocationNameDuplicate(BranchLocationNameDuplicateException ex) {
+    /** 리소스 충돌(중복 등): 409. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */
+    @ExceptionHandler(ConflictException.class)
+    public ProblemDetail handleConflict(ConflictException ex) {
         log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
     }

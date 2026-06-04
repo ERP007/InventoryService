@@ -2,25 +2,33 @@ package com.fallguys.inventoryservice.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fallguys.inventoryservice.controller.dto.WarehouseCreateRequest;
 import com.fallguys.inventoryservice.controller.dto.WarehouseListResponse;
+import com.fallguys.inventoryservice.controller.dto.WarehouseResponse;
 import com.fallguys.inventoryservice.domain.WarehouseService;
+import com.fallguys.inventoryservice.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.domain.query.WarehouseSummary;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/inventory/warehouses")
 @RequiredArgsConstructor
-@Tag(name = "Warehouse", description = "창고 조회 API")
+@Tag(name = "Warehouse", description = "창고 API")
 public class WarehouseController {
 
     private final WarehouseService warehouseService;
@@ -47,5 +55,24 @@ public class WarehouseController {
         WarehouseSearchQuery query = WarehouseSearchQuery.of(keyword, type, status, sort); // param 이 잘못되면 throw
         List<WarehouseSummary> summaries = warehouseService.search(query);
         return WarehouseListResponse.from(summaries, query.sort().toParam());
+    }
+
+    /**
+     * 신규 창고를 등록한다. ADMIN·HQ_MANAGER만 호출 가능(인가는 게이트웨이가 판단).
+     * 형식·필수·type 값 오류는 400(INVALID_PARAMETER), 유형↔branchId 정합은 400(WAREHOUSE_BRANCH_RULE),
+     * 소속 지점 미존재는 400(BRANCH_NOT_FOUND), 코드 중복은 409(WAREHOUSE_CODE_DUPLICATE)로 매핑된다.
+     */
+    @Operation(
+            summary = "창고 등록",
+            description = "창고 추가 모달의 입력으로 신규 창고를 등록한다. active=true로 생성되며 code는 시스템 유일, "
+                    + "DEALER는 branchId 필수·HQ는 branchId 불가."
+    )
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public WarehouseResponse create(@Valid @RequestBody WarehouseCreateRequest request) {
+        CreateWarehouseCommand command = CreateWarehouseCommand.of(
+                request.code(), request.name(), request.type(), request.branchId(), request.address());
+        WarehouseSummary summary = warehouseService.create(command);
+        return WarehouseResponse.from(summary);
     }
 }
