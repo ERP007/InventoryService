@@ -16,9 +16,11 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 class WarehouseServiceTest {
 
@@ -106,12 +108,39 @@ class WarehouseServiceTest {
         assertThat(repository.savedWarehouse).isNull();
     }
 
+    // ---- getById ----
+
+    @Test
+    void getById는_조회된_상세_읽기모델을_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = new WarehouseSummaryForEdit(
+                2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점", "서울 강남구",
+                true, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2025-11-02T14:30:00Z"), 5L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.getById(2L);
+
+        assertThat(result.id()).isEqualTo(2L);
+        assertThat(result.branchId()).isEqualTo(3L);
+        assertThat(result.version()).isEqualTo(5L);
+    }
+
+    @Test
+    void getById는_없으면_WarehouseNotFoundException을_던진다() {
+        WarehouseService service = new WarehouseService(
+                new StubWarehouseRepository(List.of()), new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.getById(999L))
+                .isInstanceOf(WarehouseNotFoundException.class);
+    }
+
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
         private WarehouseSearchQuery received;
         private boolean codeExists = false;
         private Warehouse savedWarehouse;
         private WarehouseSummary summaryAfterSave;
+        private WarehouseSummaryForEdit summaryForEdit;
 
         private StubWarehouseRepository(List<WarehouseSummary> searchResult) {
             this.searchResult = searchResult;
@@ -137,6 +166,11 @@ class WarehouseServiceTest {
         @Override
         public Optional<WarehouseSummary> findSummaryById(Long id) {
             return Optional.ofNullable(summaryAfterSave);
+        }
+
+        @Override
+        public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
+            return Optional.ofNullable(summaryForEdit);
         }
     }
 

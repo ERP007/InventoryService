@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 import jakarta.persistence.EntityManager;
 
@@ -96,6 +97,24 @@ class WarehouseRepositoryAdapterTest {
         List<WarehouseSummary> result = adapter.search(WarehouseSearchQuery.of("존재하지않는창고", null, null, null));
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findForEditById는_branchId_address_version까지_조인하여_반환한다() {
+        WarehouseSummaryForEdit detail = adapter.findForEditById(2L).orElseThrow();
+
+        assertThat(detail.code()).isEqualTo("HW-SE-001");
+        assertThat(detail.type()).isEqualTo(WarehouseType.DEALER);
+        assertThat(detail.branchId()).isEqualTo(10L);
+        assertThat(detail.branchName()).isEqualTo("서울 강남지점");
+        assertThat(detail.address()).isEqualTo("서울 어딘가");
+        assertThat(detail.active()).isTrue();
+        assertThat(detail.version()).isEqualTo(0L);
+    }
+
+    @Test
+    void findForEditById는_없는_id면_empty를_반환한다() {
+        assertThat(adapter.findForEditById(999L)).isEmpty();
     }
 
     private void insertBranch(long id, String name) {

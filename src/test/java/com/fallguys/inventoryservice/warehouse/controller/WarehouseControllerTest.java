@@ -28,6 +28,7 @@ import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 @WebMvcTest(WarehouseController.class)
 @Import({GlobalExceptionHandler.class, WarehouseControllerTest.StubConfig.class})
@@ -144,6 +145,37 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_CODE_DUPLICATE"));
     }
 
+    // ---- GET /{id} (단건 조회) ----
+
+    @Test
+    void 단건조회는_200과_전체필드_branchId_address_version을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.code").value("WH-SE-001"))
+                .andExpect(jsonPath("$.type").value("DEALER"))
+                .andExpect(jsonPath("$.branchId").value(3))
+                .andExpect(jsonPath("$.branchName").value("서울 강남지점"))
+                .andExpect(jsonPath("$.address").value("서울 강남구 테헤란로 521"))
+                .andExpect(jsonPath("$.version").value(5));
+    }
+
+    @Test
+    void 없는_창고는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void id가_숫자가_아니면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("id"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -177,6 +209,17 @@ class WarehouseControllerTest {
                     return Optional.of(new WarehouseSummary(
                             id, w.getCode(), w.getName(), w.getType(), branchName, w.isActive(),
                             Instant.parse("2026-05-28T14:30:00Z"), Instant.parse("2026-05-28T14:30:00Z")));
+                }
+
+                @Override
+                public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
+                    if (id != null && id == 2L) {
+                        return Optional.of(new WarehouseSummaryForEdit(
+                                2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점",
+                                "서울 강남구 테헤란로 521", true,
+                                Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2025-11-02T14:30:00Z"), 5L));
+                    }
+                    return Optional.empty();
                 }
             };
 

@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.fallguys.inventoryservice.shared.exception.BusinessException;
@@ -22,6 +24,7 @@ import com.fallguys.inventoryservice.shared.exception.ConflictException;
 import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.shared.exception.CommonErrorCode;
 import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
+import com.fallguys.inventoryservice.shared.exception.ResourceNotFoundException;
 
 /**
  * 모든 예외의 HTTP 변환을 전담한다. 예외 로깅도 이 곳에서만 수행한다(중복 금지).
@@ -45,6 +48,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleConflict(ConflictException ex) {
         log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
+    }
+
+    /** 리소스 없음(존재 은닉 포함): 404. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
+        log.warn("Not found [{}]: {}", ex.getCode(), ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, ex.getCode(), ex.getMessage());
     }
 
     /** 그 외 도메인 비즈니스 예외: 400. WARN. */
@@ -80,6 +90,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Invalid request body [{}]: {}", CommonErrorCode.INVALID_PARAMETER.getCode(), details);
         ProblemDetail problemDetail = build(HttpStatus.BAD_REQUEST, CommonErrorCode.INVALID_PARAMETER.getCode(), message);
         problemDetail.setProperty("details", details);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
+    }
+
+    /**
+     * 경로/파라미터 타입 변환 실패(예: id가 숫자가 아님): 400. errorCode를 INVALID_PARAMETER로 통일한다.
+     * 위반 파라미터를 details[]로 노출한다. 형식 오류라 WARN.
+     */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+
+        String field = (ex instanceof MethodArgumentTypeMismatchException mismatch)
+                ? mismatch.getName()
+                : ex.getPropertyName();
+        ParameterViolation violation = new ParameterViolation(field, Objects.toString(ex.getValue(), null), List.of());
+
+        log.warn("Type mismatch [{}]: field={} value={}",
+                CommonErrorCode.INVALID_PARAMETER.getCode(), field, ex.getValue());
+        ProblemDetail problemDetail = build(HttpStatus.BAD_REQUEST,
+                CommonErrorCode.INVALID_PARAMETER.getCode(), CommonErrorCode.INVALID_PARAMETER.getDefaultMessage());
+        problemDetail.setProperty("details", List.of(violation));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
     }
 
