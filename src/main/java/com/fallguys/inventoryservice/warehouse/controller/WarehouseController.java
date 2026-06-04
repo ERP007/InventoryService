@@ -3,21 +3,17 @@ package com.fallguys.inventoryservice.warehouse.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCreateRequest;
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseDetailResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseListResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseResponse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -74,5 +70,23 @@ public class WarehouseController {
                 request.code(), request.name(), request.type(), request.branchId(), request.address());
         WarehouseSummary summary = warehouseService.create(command);
         return WarehouseResponse.from(summary);
+    }
+
+
+    /**
+     * 창고 단건을 상세 조회한다. 수정 모달 프리필용이며 code는 read-only, version은 후속 수정 호출에 사용된다.
+     * id가 숫자가 아니면 400(INVALID_PARAMETER), 없거나 소속 외면 404(WAREHOUSE_NOT_FOUND, 존재 은닉)로 매핑된다.
+     */
+    @Operation(
+            summary = "창고 단건 조회",
+            description = "수정 모달 프리필을 위해 id로 창고 전체 필드를 조회한다(branchId·address·version 포함)."
+    )
+    @GetMapping("/{id}")
+    public WarehouseDetailResponse detail(
+            @Parameter(description = "창고 내부 PK")
+            @PathVariable Long id
+    ) {
+        WarehouseSummaryForEdit detail = warehouseService.getById(id);
+        return WarehouseDetailResponse.from(detail);
     }
 }
