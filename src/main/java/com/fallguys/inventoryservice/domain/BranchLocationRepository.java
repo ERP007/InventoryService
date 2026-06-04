@@ -1,0 +1,13 @@
+package com.fallguys.inventoryservice.domain;
+
+/**
+ * [DIP] 지점 영속성 추상화. 도메인이 정의하고 infrastructure가 구현한다.
+ */
+public interface BranchLocationRepository {
+
+    /** 지점명 존재 여부. 등록 전 중복 검사에 사용한다. */
+    boolean existsByName(String name);
+
+    /** 지점을 저장하고 식별자가 발급된 도메인을 반환한다. */
+    BranchLocation save(BranchLocation branchLocation);
+}

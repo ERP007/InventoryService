@@ -9,6 +9,7 @@ import lombok.Getter;
 public enum InventoryErrorCode {
 
     INVALID_PARAMETER("INVALID_PARAMETER", "요청 파라미터가 올바르지 않습니다."),
+    BRANCH_LOCATION_NAME_DUPLICATE("BRANCH_LOCATION_NAME_DUPLICATE", "이미 존재하는 지점명입니다."),
     INTERNAL_ERROR("INTERNAL_ERROR", "서버 내부 오류가 발생했습니다.");
 
     private final String code;
