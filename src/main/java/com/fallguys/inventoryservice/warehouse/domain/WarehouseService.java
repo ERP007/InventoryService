@@ -8,6 +8,7 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForE
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
@@ -116,5 +117,29 @@ public class WarehouseService {
             throw new BranchNotFoundException(command.branchId());
         }
         return warehouseRepository.update(id, command);
+    }
+
+    /**
+     * 창고 활성 상태를 전환한다. 같은 값으로의 전환은 멱등(no-op)이라 변경 없이 현재 상태를 반환한다.
+     *
+     * 흐름:
+     * 1) 식별자로 현재 상태를 조회한다(없으면 404).
+     * 2) 요청 active가 현재와 같으면 no-op으로 현재 상태를 그대로 반환한다(version 비교 없음 — 멱등·재시도 안전).
+     * 3) 다르면 영속성에 위임해 전환한다 — version 불일치는 409.
+     *
+     * 트랜잭션: 쓰기. no-op이면 사실상 읽기만 수행하고 version은 증가하지 않는다.
+     *
+     * 예외:
+     * - 창고 없음/소속 외: WarehouseNotFoundException (404)
+     * - version 불일치(실제 전환 시): OptimisticLockConflictException (409)
+     */
+    @Transactional
+    public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+        WarehouseSummaryForEdit current = warehouseRepository.findForEditById(id)
+                .orElseThrow(() -> new WarehouseNotFoundException(id));
+        if (current.active() == command.active()) {
+            return current;
+        }
+        return warehouseRepository.changeActive(id, command);
     }
 }

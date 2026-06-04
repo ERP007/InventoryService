@@ -13,6 +13,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
@@ -176,6 +177,50 @@ class WarehouseServiceTest {
         assertThat(repository.updateIdArg).isNull();
     }
 
+    // ---- changeActive ----
+
+    private static WarehouseSummaryForEdit forEdit(boolean active, long version) {
+        return new WarehouseSummaryForEdit(
+                2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점", "주소",
+                active, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"), version);
+    }
+
+    @Test
+    void changeActive는_같은_값이면_no_op으로_현재상태를_반환하고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEdit(true, 6L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive(2L, new ChangeWarehouseActiveCommand(true, 6L));
+
+        assertThat(result.active()).isTrue();
+        assertThat(result.version()).isEqualTo(6L);
+        assertThat(repository.changeActiveCalled).isFalse();
+    }
+
+    @Test
+    void changeActive는_값이_다르면_영속성에_위임한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEdit(true, 6L);
+        repository.changeActiveResult = forEdit(false, 7L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive(2L, new ChangeWarehouseActiveCommand(false, 6L));
+
+        assertThat(result.active()).isFalse();
+        assertThat(result.version()).isEqualTo(7L);
+        assertThat(repository.changeActiveCalled).isTrue();
+    }
+
+    @Test
+    void changeActive는_없으면_WarehouseNotFoundException을_던진다() {
+        WarehouseService service = new WarehouseService(
+                new StubWarehouseRepository(List.of()), new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.changeActive(999L, new ChangeWarehouseActiveCommand(false, 6L)))
+                .isInstanceOf(WarehouseNotFoundException.class);
+    }
+
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
         private WarehouseSearchQuery received;
@@ -186,6 +231,8 @@ class WarehouseServiceTest {
         private WarehouseSummaryForEdit updatedResult;
         private Long updateIdArg;
         private UpdateWarehouseCommand updateCommandArg;
+        private WarehouseSummaryForEdit changeActiveResult;
+        private boolean changeActiveCalled = false;
 
         private StubWarehouseRepository(List<WarehouseSummary> searchResult) {
             this.searchResult = searchResult;
@@ -223,6 +270,12 @@ class WarehouseServiceTest {
             this.updateIdArg = id;
             this.updateCommandArg = command;
             return updatedResult;
+        }
+
+        @Override
+        public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+            this.changeActiveCalled = true;
+            return changeActiveResult;
         }
     }
 

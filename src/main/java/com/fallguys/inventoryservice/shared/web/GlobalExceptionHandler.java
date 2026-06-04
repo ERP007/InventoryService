@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -114,6 +115,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = build(HttpStatus.BAD_REQUEST,
                 CommonErrorCode.INVALID_PARAMETER.getCode(), CommonErrorCode.INVALID_PARAMETER.getDefaultMessage());
         problemDetail.setProperty("details", List.of(violation));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
+    }
+
+    /**
+     * 요청 바디 파싱 실패(JSON 문법 오류·타입 불일치 등): 400. errorCode를 INVALID_PARAMETER로 통일한다.
+     * 원본 파싱 상세는 클라이언트에 노출하지 않는다. 형식 오류라 WARN.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+
+        log.warn("Malformed request body [{}]: {}", CommonErrorCode.INVALID_PARAMETER.getCode(), ex.getMessage());
+        ProblemDetail problemDetail = build(HttpStatus.BAD_REQUEST,
+                CommonErrorCode.INVALID_PARAMETER.getCode(), CommonErrorCode.INVALID_PARAMETER.getDefaultMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
     }
 

@@ -91,6 +91,11 @@ public class WarehouseEntity {
         this.address = command.address();
     }
 
+    /** 활성 상태를 변경한다(version은 @Version이, updatedAt은 @PreUpdate가 갱신). */
+    public void changeActive(boolean active) {
+        this.active = active;
+    }
+
     /** 최초 영속 시 생성·수정 시각을 현재 시각으로 채운다(도메인에 시계 의존을 두지 않기 위함). */
     @PrePersist
     void onCreate() {

@@ -5,12 +5,15 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseActiveRequest;
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseActiveResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCreateRequest;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseDetailResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseListResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseUpdateRequest;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
@@ -112,5 +115,26 @@ public class WarehouseController {
                 request.branchId(), request.address(), request.version());
         WarehouseSummaryForEdit detail = warehouseService.update(id, command);
         return WarehouseDetailResponse.from(detail);
+    }
+
+    /**
+     * 창고 활성 상태를 전환한다. ADMIN·HQ_MANAGER만 호출 가능(인가는 게이트웨이가 판단).
+     * 같은 값이면 멱등 no-op(200), active 누락·형식 오류는 400(INVALID_PARAMETER),
+     * 없으면 404(WAREHOUSE_NOT_FOUND), version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT).
+     */
+    @Operation(
+            summary = "창고 활성 상태 전환",
+            description = "창고를 활성↔비활성으로 전환한다. 같은 값으로의 전환은 멱등(no-op)이며 version으로 낙관적 락을 검증한다."
+    )
+    @PatchMapping("/{id}/active")
+    public WarehouseActiveResponse changeActive(
+            @Parameter(description = "창고 내부 PK")
+            @PathVariable Long id,
+            @Valid @RequestBody WarehouseActiveRequest request
+    ) {
+        ChangeWarehouseActiveCommand command =
+                new ChangeWarehouseActiveCommand(request.active(), request.version());
+        WarehouseSummaryForEdit detail = warehouseService.changeActive(id, command);
+        return WarehouseActiveResponse.from(detail);
     }
 }

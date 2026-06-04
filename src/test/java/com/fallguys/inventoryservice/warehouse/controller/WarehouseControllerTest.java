@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.controller;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -27,6 +28,7 @@ import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictExce
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
@@ -264,6 +266,79 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("OPTIMISTIC_LOCK_CONFLICT"));
     }
 
+    // ---- PATCH /{id}/active (활성 전환) ----
+
+    @Test
+    void 활성전환은_200과_변경된_active_version증가를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false,"version":5}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.version").value(6))
+                .andExpect(jsonPath("$.updatedAt").exists());
+    }
+
+    @Test
+    void 같은_값으로의_전환은_멱등_no_op_200이며_version이_그대로다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":true,"version":5}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.version").value(5));
+    }
+
+    @Test
+    void active가_없으면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"version":5}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("active"));
+    }
+
+    @Test
+    void active_형식이_틀리면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":"네","version":5}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void 없는_창고_전환은_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/999/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false,"version":5}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"));
+    }
+
+    @Test
+    void 전환시_version이_불일치하면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/warehouses/2/active")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false,"version":4}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("OPTIMISTIC_LOCK_CONFLICT"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -323,6 +398,18 @@ class WarehouseControllerTest {
                             2L, "WH-SE-001", command.name(), command.type(), command.branchId(), branchName,
                             command.address(), true,
                             Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:31:00Z"),
+                            command.version() + 1);
+                }
+
+                @Override
+                public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+                    if (!command.version().equals(5L)) {
+                        throw new OptimisticLockConflictException("conflict");
+                    }
+                    return new WarehouseSummaryForEdit(
+                            2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점",
+                            "서울 강남구 테헤란로 521", command.active(),
+                            Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"),
                             command.version() + 1);
                 }
             };

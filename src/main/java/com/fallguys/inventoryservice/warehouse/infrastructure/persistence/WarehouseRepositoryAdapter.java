@@ -14,6 +14,7 @@ import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictExce
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
@@ -84,6 +85,29 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
 
         return jpaDao.findForEditById(id)
                 .orElseThrow(() -> new IllegalStateException("수정된 창고를 조회하지 못했습니다: " + id));
+    }
+
+    /**
+     * 영속 엔티티를 조회해 활성 상태를 전환한다(no-op 판정은 호출 전 도메인 서비스가 수행).
+     * version 명시 비교로 충돌(409)을 막고, flush 시 @Version이 동시 수정을 한 번 더 검증한다.
+     */
+    @Override
+    public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+        WarehouseEntity entity = jpaDao.findById(id)
+                .orElseThrow(() -> new WarehouseNotFoundException(id));
+        if (!Objects.equals(entity.getVersion(), command.version())) {
+            throw new OptimisticLockConflictException(
+                    "창고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
+        }
+        entity.changeActive(command.active());
+        try {
+            jpaDao.saveAndFlush(entity);
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new OptimisticLockConflictException(
+                    "창고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
+        }
+        return jpaDao.findForEditById(id)
+                .orElseThrow(() -> new IllegalStateException("전환된 창고를 조회하지 못했습니다: " + id));
     }
 
     /** 부분 일치 LIKE 패턴으로 변환한다(소문자화 + 양끝 와일드카드). 검색어가 없으면 null. */

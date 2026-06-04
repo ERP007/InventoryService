@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.domain;
 import java.util.List;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
@@ -35,4 +36,10 @@ public interface WarehouseRepository {
      * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).
      */
     WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command);
+
+    /**
+     * 활성 상태를 전환하고 갱신된 읽기 모델을 반환한다(실제 상태 변경이 있는 경우만 호출된다).
+     * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).
+     */
+    WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command);
 }

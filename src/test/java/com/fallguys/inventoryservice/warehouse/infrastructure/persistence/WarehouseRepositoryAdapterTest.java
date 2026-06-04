@@ -14,6 +14,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
@@ -144,6 +145,30 @@ class WarehouseRepositoryAdapterTest {
     void update는_없는_창고면_WarehouseNotFoundException을_던진다() {
         assertThatThrownBy(() -> adapter.update(999L,
                 new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 10L, null, 0L)))
+                .isInstanceOf(WarehouseNotFoundException.class);
+    }
+
+    @Test
+    void changeActive는_상태를_전환하고_version과_updatedAt을_올린다() {
+        WarehouseSummaryForEdit result = adapter.changeActive(2L,
+                new ChangeWarehouseActiveCommand(false, 0L));
+
+        assertThat(result.active()).isFalse();
+        assertThat(result.version()).isEqualTo(1L);
+        assertThat(result.updatedAt()).isAfter(result.createdAt());
+    }
+
+    @Test
+    void changeActive는_version이_불일치하면_OptimisticLockConflictException을_던진다() {
+        assertThatThrownBy(() -> adapter.changeActive(2L,
+                new ChangeWarehouseActiveCommand(false, 99L)))
+                .isInstanceOf(OptimisticLockConflictException.class);
+    }
+
+    @Test
+    void changeActive는_없는_창고면_WarehouseNotFoundException을_던진다() {
+        assertThatThrownBy(() -> adapter.changeActive(999L,
+                new ChangeWarehouseActiveCommand(false, 0L)))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
