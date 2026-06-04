@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.domain;
 import java.util.List;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -28,4 +29,10 @@ public interface WarehouseRepository {
 
     /** 식별자로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
     Optional<WarehouseSummaryForEdit> findForEditById(Long id);
+
+    /**
+     * 변경 가능 항목을 수정하고 갱신된 읽기 모델을 반환한다.
+     * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).
+     */
+    WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command);
 }

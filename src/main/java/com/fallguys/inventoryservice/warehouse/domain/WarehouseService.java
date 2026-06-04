@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
@@ -90,5 +91,30 @@ public class WarehouseService {
     public WarehouseSummaryForEdit getById(Long id) {
         return warehouseRepository.findForEditById(id)
                 .orElseThrow(() -> new WarehouseNotFoundException(id));
+    }
+
+    /**
+     * 창고의 변경 가능 항목(name·type·branchId·address)을 수정한다. code는 불변(Command가 거부)이다.
+     *
+     * 흐름:
+     * 1) 유형↔branchId 정합을 도메인 불변식으로 검증한다(DB 접근 없음).
+     * 2) DEALER면 소속 지점(branchId)이 실제 존재하는지 확인한다(참조 무결성).
+     * 3) 영속성에 위임해 수정한다 — 창고 없음(404)·version 충돌(409)은 이 단계에서 판정된다.
+     *
+     * 트랜잭션: 쓰기. 검증·참조·충돌 실패 시 변경 없이 롤백된다.
+     *
+     * 예외:
+     * - 유형↔branchId 정합 위반: WarehouseBranchRuleException (400)
+     * - 소속 지점 미존재: BranchNotFoundException (400)
+     * - 창고 없음/소속 외: WarehouseNotFoundException (404)
+     * - version 불일치(동시 수정): OptimisticLockConflictException (409)
+     */
+    @Transactional
+    public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
+        Warehouse.validateBranchRule(command.type(), command.branchId());
+        if (command.branchId() != null && !branchLocationRepository.existsById(command.branchId())) {
+            throw new BranchNotFoundException(command.branchId());
+        }
+        return warehouseRepository.update(id, command);
     }
 }

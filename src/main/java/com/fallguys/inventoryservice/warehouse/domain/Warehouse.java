@@ -46,7 +46,13 @@ public class Warehouse {
                 command.branchId(), command.address(), true);
     }
 
-    private static void validateBranchRule(WarehouseType type, Long branchId) {
+    /**
+     * 유형↔소속지점(branchId) 정합 불변식. 생성·수정 모두에서 사용한다(같은 패키지의 서비스가 재사용).
+     * DEALER는 branchId 필수, HQ는 branchId 불가.
+     *
+     * @throws WarehouseBranchRuleException 정합 위반 시(400)
+     */
+    static void validateBranchRule(WarehouseType type, Long branchId) {
         if (type == WarehouseType.DEALER && branchId == null) {
             throw new WarehouseBranchRuleException("DEALER 유형은 소속 지점(branchId)이 필수입니다.");
         }
