@@ -1,5 +1,8 @@
 package com.fallguys.inventoryservice.infrastructure.persistence;
 
+import java.util.List;
+
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import com.fallguys.inventoryservice.domain.BranchLocation;
@@ -22,5 +25,12 @@ public class BranchLocationRepositoryAdapter implements BranchLocationRepository
     public BranchLocation save(BranchLocation branchLocation) {
         BranchLocationEntity saved = jpaDao.save(BranchLocationEntity.from(branchLocation));
         return saved.toDomain();
+    }
+
+    @Override
+    public List<BranchLocation> findAll() {
+        return jpaDao.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
+                .map(BranchLocationEntity::toDomain)
+                .toList();
     }
 }

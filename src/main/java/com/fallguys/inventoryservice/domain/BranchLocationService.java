@@ -1,5 +1,7 @@
 package com.fallguys.inventoryservice.domain;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,5 +36,15 @@ public class BranchLocationService {
         }
         BranchLocation branchLocation = BranchLocation.create(command.name());
         return branchLocationRepository.save(branchLocation);
+    }
+
+    /**
+     * 전체 지점 목록을 조회한다. 창고 추가/수정 모달의 소속 지점 드롭다운 채움 용도라 검색·필터가 없다.
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 지점이 0건이면 빈 목록을 반환한다(404 아님).
+     */
+    @Transactional(readOnly = true)
+    public List<BranchLocation> findAll() {
+        return branchLocationRepository.findAll();
     }
 }
