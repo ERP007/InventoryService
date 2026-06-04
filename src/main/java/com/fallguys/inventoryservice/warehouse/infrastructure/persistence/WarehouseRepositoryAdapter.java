@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -42,6 +43,11 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     @Override
     public Optional<WarehouseSummary> findSummaryById(Long id) {
         return jpaDao.findSummaryById(id);
+    }
+
+    @Override
+    public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
+        return jpaDao.findForEditById(id);
     }
 
     /** 부분 일치 LIKE 패턴으로 변환한다(소문자화 + 양끝 와일드카드). 검색어가 없으면 null. */

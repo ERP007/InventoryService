@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.infrastructure.persistence;
 import java.util.List;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -59,4 +60,15 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
             WHERE w.id = :id
             """)
     Optional<WarehouseSummary> findSummaryById(@Param("id") Long id);
+
+
+    @Query("""
+        SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit(
+            w.id, w.code, w.name, w.type, w.branchId, b.name, w.address,
+            w.active, w.createdAt, w.updatedAt, w.version)
+        FROM WarehouseEntity w
+        LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
+        WHERE w.id = :id
+        """)
+    Optional<WarehouseSummaryForEdit> findForEditById(@Param("id") Long id);
 }
