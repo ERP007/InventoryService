@@ -1,5 +1,8 @@
 package com.fallguys.inventoryservice.config;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -8,15 +11,24 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 
 @Configuration
 public class OpenApiConfig {
 
     private static final String BEARER_SCHEME = "bearer-jwt";
 
+    /**
+     * Swagger "Try it out"이 호출할 외부 베이스 URL.
+     * 게이트웨이(/api 접두어) 뒤 배포 환경에서는 OPENAPI_SERVER_URL=https://api.erp007.xyz/api 로 지정한다.
+     * 비어 있으면(로컬) springdoc이 요청 기준으로 server url을 자동 생성한다.
+     */
+    @Value("${OPENAPI_SERVER_URL:}")
+    private String serverUrl;
+
     @Bean
     public OpenAPI inventoryOpenApi() {
-        return new OpenAPI()
+        OpenAPI openApi = new OpenAPI()
                 .info(new Info()
                         .title("Inventory Service API")
                         .description("창고 및 재고 이동 이력 서비스 API")
@@ -29,5 +41,11 @@ public class OpenApiConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")));
+
+        // 배포: 외부 베이스 URL을 명시해 Try it out이 같은 origin(/api/inventory/...)으로 호출하게 한다(CORS 방지).
+        if (serverUrl != null && !serverUrl.isBlank()) {
+            openApi.servers(List.of(new Server().url(serverUrl)));
+        }
+        return openApi;
     }
 }
