@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.warehouse.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -47,7 +48,7 @@ public class WarehouseController {
             description = "검색어/유형/상태 필터와 정렬로 창고 목록을 조회한다. 매칭 0건이어도 200과 빈 배열을 반환한다."
     )
     @GetMapping
-    public WarehouseListResponse list(
+    public ResponseEntity<WarehouseListResponse> list(
             @Parameter(description = "창고명 또는 창고 코드 부분 일치 (예: 본사 중앙창고, WH-02-001)")
             @RequestParam(required = false) String keyword,
             @Parameter(description = "창고 유형 필터")
@@ -59,7 +60,7 @@ public class WarehouseController {
     ) {
         WarehouseSearchQuery query = WarehouseSearchQuery.of(keyword, type, status, sort); // param 이 잘못되면 throw
         List<WarehouseSummary> summaries = warehouseService.search(query);
-        return WarehouseListResponse.from(summaries, query.sort().toParam());
+        return ResponseEntity.ok(WarehouseListResponse.from(summaries, query.sort().toParam()));
     }
 
     /**
@@ -73,15 +74,14 @@ public class WarehouseController {
                     + "DEALER는 branchId 필수·HQ는 branchId 불가."
     )
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public WarehouseResponse create(
+    public ResponseEntity<WarehouseResponse> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody WarehouseCreateRequest request) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         CreateWarehouseCommand command = CreateWarehouseCommand.of(
                 request.code(), request.name(), request.type(), request.branchId(), request.address());
         WarehouseSummary summary = warehouseService.create(command);
-        return WarehouseResponse.from(summary);
+        return ResponseEntity.status(HttpStatus.CREATED).body(WarehouseResponse.from(summary));
     }
 
 
@@ -95,14 +95,14 @@ public class WarehouseController {
             description = "수정 모달 프리필을 위해 창고 코드로 전체 필드를 조회한다(branchId·address·version 포함)."
     )
     @GetMapping("/{code}")
-    public WarehouseDetailResponse detail(
+    public ResponseEntity<WarehouseDetailResponse> detail(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "창고 코드 (예: WH-SE-001)")
             @PathVariable String code
     ) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         WarehouseSummaryForEdit detail = warehouseService.getByCode(code);
-        return WarehouseDetailResponse.from(detail);
+        return ResponseEntity.ok(WarehouseDetailResponse.from(detail));
     }
 
     /**
@@ -115,7 +115,7 @@ public class WarehouseController {
             description = "창고명·유형·소속 지점·주소를 수정한다. code는 변경 불가이며 version으로 낙관적 락을 검증한다."
     )
     @PutMapping("/{code}")
-    public WarehouseDetailResponse update(
+    public ResponseEntity<WarehouseDetailResponse> update(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "창고 코드 (예: WH-SE-001)")
             @PathVariable String code,
@@ -126,7 +126,7 @@ public class WarehouseController {
                 request.code(), request.name(), request.type(),
                 request.branchId(), request.address(), request.version());
         WarehouseSummaryForEdit detail = warehouseService.update(code, command);
-        return WarehouseDetailResponse.from(detail);
+        return ResponseEntity.ok(WarehouseDetailResponse.from(detail));
     }
 
     /**
@@ -139,7 +139,7 @@ public class WarehouseController {
             description = "창고를 활성↔비활성으로 전환한다. 같은 값으로의 전환은 멱등(no-op)이며 version으로 낙관적 락을 검증한다."
     )
     @PatchMapping("/{code}/active")
-    public WarehouseActiveResponse changeActive(
+    public ResponseEntity<WarehouseActiveResponse> changeActive(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "창고 코드 (예: WH-SE-001)")
             @PathVariable String code,
@@ -149,6 +149,6 @@ public class WarehouseController {
         ChangeWarehouseActiveCommand command =
                 new ChangeWarehouseActiveCommand(request.active(), request.version());
         WarehouseSummaryForEdit detail = warehouseService.changeActive(code, command);
-        return WarehouseActiveResponse.from(detail);
+        return ResponseEntity.ok(WarehouseActiveResponse.from(detail));
     }
 }

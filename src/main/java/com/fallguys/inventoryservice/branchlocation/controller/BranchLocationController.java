@@ -1,13 +1,13 @@
 package com.fallguys.inventoryservice.branchlocation.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fallguys.inventoryservice.branchlocation.controller.dto.BranchLocationCreateRequest;
@@ -41,13 +41,12 @@ public class BranchLocationController {
             description = "신규 소속 지점을 마스터에 등록한다. 지점명은 trim 후 1~100자이며 시스템 내 유일하다."
     )
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public BranchLocationResponse create(
+    public ResponseEntity<BranchLocationResponse> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody BranchLocationCreateRequest request) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         BranchLocation created = branchLocationService.create(new CreateBranchLocationCommand(request.name()));
-        return BranchLocationResponse.from(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(BranchLocationResponse.from(created));
     }
 
     /**
@@ -59,8 +58,8 @@ public class BranchLocationController {
             description = "전체 소속 지점을 id 오름차순으로 반환한다. 검색·필터 파라미터는 없으며, 0건이면 빈 배열을 반환한다."
     )
     @GetMapping
-    public BranchLocationListResponse list(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<BranchLocationListResponse> list(@AuthenticationPrincipal Jwt jwt) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
-        return BranchLocationListResponse.from(branchLocationService.findAll());
+        return ResponseEntity.ok(BranchLocationListResponse.from(branchLocationService.findAll()));
     }
 }
