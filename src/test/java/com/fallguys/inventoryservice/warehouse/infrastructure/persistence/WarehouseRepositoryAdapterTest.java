@@ -18,6 +18,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseAct
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -102,6 +103,19 @@ class WarehouseRepositoryAdapterTest {
         List<WarehouseSummary> result = adapter.search(WarehouseSearchQuery.of("존재하지않는창고", null, null, null));
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findActiveHq는_활성_본사창고만_code오름차순으로_반환한다() {
+        // 비활성 HQ를 추가해 active 필터를 검증한다(seed에는 활성 HQ-001 + DEALER 2건만 있음).
+        insertWarehouse(4L, "HQ-002", "본사 비활성창고", "HQ", null, false, "2024-06-01T09:00:00Z");
+
+        List<WarehouseHqSummary> result = adapter.findActiveHq();
+
+        // 활성 HQ만(HQ-001), 비활성 HQ(HQ-002)·DEALER(HW-SE-*)는 제외
+        assertThat(result).extracting(WarehouseHqSummary::code).containsExactly("HQ-001");
+        assertThat(result.get(0).id()).isEqualTo(1L);
+        assertThat(result.get(0).name()).isEqualTo("본사 중앙창고");
     }
 
     @Test

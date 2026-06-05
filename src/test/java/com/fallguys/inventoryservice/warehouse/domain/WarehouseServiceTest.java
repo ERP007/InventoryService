@@ -21,6 +21,7 @@ import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseBranchR
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -55,6 +56,22 @@ class WarehouseServiceTest {
         List<WarehouseSummary> result = service.search(WarehouseSearchQuery.of(null, null, null, null));
 
         assertThat(result).isEmpty();
+    }
+
+    // ---- findHqWarehouses ----
+
+    @Test
+    void findHqWarehouses는_레포지토리의_활성HQ_목록을_그대로_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.hqSummaries = List.of(
+                new WarehouseHqSummary(1L, "WH-HQ-001", "본사 서울 창고"),
+                new WarehouseHqSummary(5L, "WH-HQ-002", "본사 부산 창고"));
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        List<WarehouseHqSummary> result = service.findHqWarehouses();
+
+        assertThat(result).extracting(WarehouseHqSummary::code)
+                .containsExactly("WH-HQ-001", "WH-HQ-002");
     }
 
     // ---- create ----
@@ -224,6 +241,7 @@ class WarehouseServiceTest {
 
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
+        private List<WarehouseHqSummary> hqSummaries = List.of();
         private WarehouseSearchQuery received;
         private boolean codeExists = false;
         private Warehouse savedWarehouse;
@@ -244,6 +262,11 @@ class WarehouseServiceTest {
         public List<WarehouseSummary> search(WarehouseSearchQuery query) {
             this.received = query;
             return searchResult;
+        }
+
+        @Override
+        public List<WarehouseHqSummary> findActiveHq() {
+            return hqSummaries;
         }
 
         @Override

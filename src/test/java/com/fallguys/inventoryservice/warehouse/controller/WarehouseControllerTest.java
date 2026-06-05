@@ -37,6 +37,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseAct
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -93,6 +94,19 @@ class WarehouseControllerTest {
     void 인증토큰이_없으면_401을_반환한다() throws Exception {
         mockMvc.perform(get("/inventory/warehouses"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---- GET /hq (본사 창고 드롭다운) : 전체 Role 허용 ----
+
+    @Test
+    void 본사창고_목록조회는_200과_id_code_name_슬림응답을_반환한다() throws Exception {
+        // 전 Role 허용이므로 가장 낮은 BRANCH_STAFF로도 조회된다. (/hq 가 /{code} 보다 우선 매칭됨도 검증)
+        mockMvc.perform(get("/inventory/warehouses/hq").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].code").value("WH-HQ-001"))
+                .andExpect(jsonPath("$.content[0].name").value("본사 서울 창고"))
+                .andExpect(jsonPath("$.content[1].code").value("WH-HQ-002"));
     }
 
     // ---- POST (등록) : ADMIN·HQ_MANAGER ----
@@ -437,6 +451,13 @@ class WarehouseControllerTest {
                     return List.of(new WarehouseSummary(
                             1L, "HQ-001", "본사 중앙창고", WarehouseType.HQ, null, true,
                             Instant.parse("2024-01-15T09:00:00Z"), Instant.parse("2024-01-15T09:00:00Z")));
+                }
+
+                @Override
+                public List<WarehouseHqSummary> findActiveHq() {
+                    return List.of(
+                            new WarehouseHqSummary(1L, "WH-HQ-001", "본사 서울 창고"),
+                            new WarehouseHqSummary(5L, "WH-HQ-002", "본사 부산 창고"));
                 }
 
                 @Override
