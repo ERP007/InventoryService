@@ -148,11 +148,11 @@ class WarehouseServiceTest {
                 true, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:31:00Z"), 6L);
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
 
-        WarehouseSummaryForEdit result = service.update(2L,
+        WarehouseSummaryForEdit result = service.update("WH-SE-001",
                 new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 3L, "새 주소", 5L));
 
         assertThat(result.version()).isEqualTo(6L);
-        assertThat(repository.updateIdArg).isEqualTo(2L);
+        assertThat(repository.updateCodeArg).isEqualTo("WH-SE-001");
         assertThat(repository.updateCommandArg.name()).isEqualTo("서울 1창고 (강남)");
     }
 
@@ -161,10 +161,10 @@ class WarehouseServiceTest {
         StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
 
-        assertThatThrownBy(() -> service.update(2L,
+        assertThatThrownBy(() -> service.update("WH-SE-001",
                 new UpdateWarehouseCommand("본사", WarehouseType.HQ, 3L, null, 5L)))
                 .isInstanceOf(WarehouseBranchRuleException.class);
-        assertThat(repository.updateIdArg).isNull();
+        assertThat(repository.updateCodeArg).isNull();
     }
 
     @Test
@@ -172,10 +172,10 @@ class WarehouseServiceTest {
         StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(false));
 
-        assertThatThrownBy(() -> service.update(2L,
+        assertThatThrownBy(() -> service.update("WH-SE-001",
                 new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 99L, null, 5L)))
                 .isInstanceOf(BranchNotFoundException.class);
-        assertThat(repository.updateIdArg).isNull();
+        assertThat(repository.updateCodeArg).isNull();
     }
 
     // ---- changeActive ----
@@ -192,7 +192,7 @@ class WarehouseServiceTest {
         repository.summaryForEdit = forEdit(true, 6L);
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
 
-        WarehouseSummaryForEdit result = service.changeActive(2L, new ChangeWarehouseActiveCommand(true, 6L));
+        WarehouseSummaryForEdit result = service.changeActive("WH-SE-001", new ChangeWarehouseActiveCommand(true, 6L));
 
         assertThat(result.active()).isTrue();
         assertThat(result.version()).isEqualTo(6L);
@@ -206,7 +206,7 @@ class WarehouseServiceTest {
         repository.changeActiveResult = forEdit(false, 7L);
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
 
-        WarehouseSummaryForEdit result = service.changeActive(2L, new ChangeWarehouseActiveCommand(false, 6L));
+        WarehouseSummaryForEdit result = service.changeActive("WH-SE-001", new ChangeWarehouseActiveCommand(false, 6L));
 
         assertThat(result.active()).isFalse();
         assertThat(result.version()).isEqualTo(7L);
@@ -218,7 +218,7 @@ class WarehouseServiceTest {
         WarehouseService service = new WarehouseService(
                 new StubWarehouseRepository(List.of()), new StubBranchLocationRepository(true));
 
-        assertThatThrownBy(() -> service.changeActive(999L, new ChangeWarehouseActiveCommand(false, 6L)))
+        assertThatThrownBy(() -> service.changeActive("NOPE", new ChangeWarehouseActiveCommand(false, 6L)))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
@@ -231,7 +231,7 @@ class WarehouseServiceTest {
         private WarehouseSummaryForEdit summaryForEdit;
         private String findForEditCodeArg;
         private WarehouseSummaryForEdit updatedResult;
-        private Long updateIdArg;
+        private String updateCodeArg;
         private UpdateWarehouseCommand updateCommandArg;
         private WarehouseSummaryForEdit changeActiveResult;
         private boolean changeActiveCalled = false;
@@ -263,25 +263,20 @@ class WarehouseServiceTest {
         }
 
         @Override
-        public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
-            return Optional.ofNullable(summaryForEdit);
-        }
-
-        @Override
         public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
             this.findForEditCodeArg = code;
             return Optional.ofNullable(summaryForEdit);
         }
 
         @Override
-        public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
-            this.updateIdArg = id;
+        public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
+            this.updateCodeArg = code;
             this.updateCommandArg = command;
             return updatedResult;
         }
 
         @Override
-        public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+        public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
             this.changeActiveCalled = true;
             return changeActiveResult;
         }

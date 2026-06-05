@@ -68,17 +68,10 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
             w.active, w.createdAt, w.updatedAt, w.version)
         FROM WarehouseEntity w
         LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
-        WHERE w.id = :id
-        """)
-    Optional<WarehouseSummaryForEdit> findForEditById(@Param("id") Long id);
-
-    @Query("""
-        SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit(
-            w.id, w.code, w.name, w.type, w.branchId, b.name, w.address,
-            w.active, w.createdAt, w.updatedAt, w.version)
-        FROM WarehouseEntity w
-        LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
         WHERE w.code = :code
         """)
     Optional<WarehouseSummaryForEdit> findForEditByCode(@Param("code") String code);
+
+    /** 수정·상태전환 시 변경 대상 영속 엔티티를 창고 코드로 로드한다(code는 시스템 유일). */
+    Optional<WarehouseEntity> findByCode(String code);
 }

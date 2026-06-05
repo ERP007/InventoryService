@@ -107,48 +107,48 @@ public class WarehouseController {
 
     /**
      * 창고의 변경 가능 항목을 수정한다. ADMIN·HQ_MANAGER만 호출 가능(그 외 Role은 403 FORBIDDEN).
-     * code 포함 시 400(WAREHOUSE_CODE_IMMUTABLE), 값/정합 오류는 400, 없으면 404(WAREHOUSE_NOT_FOUND),
-     * version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT)로 매핑된다.
+     * 창고 코드(code)로 대상을 식별한다. body에 code 포함 시 400(WAREHOUSE_CODE_IMMUTABLE),
+     * 값/정합 오류는 400, 없으면 404(WAREHOUSE_NOT_FOUND), version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT)로 매핑된다.
      */
     @Operation(
             summary = "창고 수정",
             description = "창고명·유형·소속 지점·주소를 수정한다. code는 변경 불가이며 version으로 낙관적 락을 검증한다."
     )
-    @PutMapping("/{id}")
+    @PutMapping("/{code}")
     public WarehouseDetailResponse update(
             @AuthenticationPrincipal Jwt jwt,
-            @Parameter(description = "창고 내부 PK")
-            @PathVariable Long id,
+            @Parameter(description = "창고 코드 (예: WH-SE-001)")
+            @PathVariable String code,
             @Valid @RequestBody WarehouseUpdateRequest request
     ) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         UpdateWarehouseCommand command = UpdateWarehouseCommand.of(
                 request.code(), request.name(), request.type(),
                 request.branchId(), request.address(), request.version());
-        WarehouseSummaryForEdit detail = warehouseService.update(id, command);
+        WarehouseSummaryForEdit detail = warehouseService.update(code, command);
         return WarehouseDetailResponse.from(detail);
     }
 
     /**
      * 창고 활성 상태를 전환한다. ADMIN·HQ_MANAGER만 호출 가능(그 외 Role은 403 FORBIDDEN).
-     * 같은 값이면 멱등 no-op(200), active 누락·형식 오류는 400(INVALID_PARAMETER),
+     * 창고 코드(code)로 대상을 식별한다. 같은 값이면 멱등 no-op(200), active 누락·형식 오류는 400(INVALID_PARAMETER),
      * 없으면 404(WAREHOUSE_NOT_FOUND), version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT).
      */
     @Operation(
             summary = "창고 활성 상태 전환",
             description = "창고를 활성↔비활성으로 전환한다. 같은 값으로의 전환은 멱등(no-op)이며 version으로 낙관적 락을 검증한다."
     )
-    @PatchMapping("/{id}/active")
+    @PatchMapping("/{code}/active")
     public WarehouseActiveResponse changeActive(
             @AuthenticationPrincipal Jwt jwt,
-            @Parameter(description = "창고 내부 PK")
-            @PathVariable Long id,
+            @Parameter(description = "창고 코드 (예: WH-SE-001)")
+            @PathVariable String code,
             @Valid @RequestBody WarehouseActiveRequest request
     ) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         ChangeWarehouseActiveCommand command =
                 new ChangeWarehouseActiveCommand(request.active(), request.version());
-        WarehouseSummaryForEdit detail = warehouseService.changeActive(id, command);
+        WarehouseSummaryForEdit detail = warehouseService.changeActive(code, command);
         return WarehouseActiveResponse.from(detail);
     }
 }

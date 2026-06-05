@@ -105,24 +105,6 @@ class WarehouseRepositoryAdapterTest {
     }
 
     @Test
-    void findForEditById는_branchId_address_version까지_조인하여_반환한다() {
-        WarehouseSummaryForEdit detail = adapter.findForEditById(2L).orElseThrow();
-
-        assertThat(detail.code()).isEqualTo("HW-SE-001");
-        assertThat(detail.type()).isEqualTo(WarehouseType.DEALER);
-        assertThat(detail.branchId()).isEqualTo(10L);
-        assertThat(detail.branchName()).isEqualTo("서울 강남지점");
-        assertThat(detail.address()).isEqualTo("서울 어딘가");
-        assertThat(detail.active()).isTrue();
-        assertThat(detail.version()).isEqualTo(0L);
-    }
-
-    @Test
-    void findForEditById는_없는_id면_empty를_반환한다() {
-        assertThat(adapter.findForEditById(999L)).isEmpty();
-    }
-
-    @Test
     void findForEditByCode는_branchId_address_version까지_조인하여_반환한다() {
         WarehouseSummaryForEdit detail = adapter.findForEditByCode("HW-SE-001").orElseThrow();
 
@@ -143,7 +125,7 @@ class WarehouseRepositoryAdapterTest {
 
     @Test
     void update는_변경항목을_수정하고_version과_updatedAt을_올린다() {
-        WarehouseSummaryForEdit result = adapter.update(2L,
+        WarehouseSummaryForEdit result = adapter.update("HW-SE-001",
                 new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 10L, "새 주소", 0L));
 
         assertThat(result.name()).isEqualTo("서울 1창고 (강남)");
@@ -155,21 +137,21 @@ class WarehouseRepositoryAdapterTest {
 
     @Test
     void update는_version이_불일치하면_OptimisticLockConflictException을_던진다() {
-        assertThatThrownBy(() -> adapter.update(2L,
+        assertThatThrownBy(() -> adapter.update("HW-SE-001",
                 new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 10L, null, 99L)))
                 .isInstanceOf(OptimisticLockConflictException.class);
     }
 
     @Test
     void update는_없는_창고면_WarehouseNotFoundException을_던진다() {
-        assertThatThrownBy(() -> adapter.update(999L,
+        assertThatThrownBy(() -> adapter.update("NOPE-999",
                 new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 10L, null, 0L)))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
     @Test
     void changeActive는_상태를_전환하고_version과_updatedAt을_올린다() {
-        WarehouseSummaryForEdit result = adapter.changeActive(2L,
+        WarehouseSummaryForEdit result = adapter.changeActive("HW-SE-001",
                 new ChangeWarehouseActiveCommand(false, 0L));
 
         assertThat(result.active()).isFalse();
@@ -179,14 +161,14 @@ class WarehouseRepositoryAdapterTest {
 
     @Test
     void changeActive는_version이_불일치하면_OptimisticLockConflictException을_던진다() {
-        assertThatThrownBy(() -> adapter.changeActive(2L,
+        assertThatThrownBy(() -> adapter.changeActive("HW-SE-001",
                 new ChangeWarehouseActiveCommand(false, 99L)))
                 .isInstanceOf(OptimisticLockConflictException.class);
     }
 
     @Test
     void changeActive는_없는_창고면_WarehouseNotFoundException을_던진다() {
-        assertThatThrownBy(() -> adapter.changeActive(999L,
+        assertThatThrownBy(() -> adapter.changeActive("NOPE-999",
                 new ChangeWarehouseActiveCommand(false, 0L)))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }

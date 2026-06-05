@@ -52,11 +52,6 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     }
 
     @Override
-    public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
-        return jpaDao.findForEditById(id);
-    }
-
-    @Override
     public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
         return jpaDao.findForEditByCode(code);
     }
@@ -64,14 +59,14 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     /**
      * 영속 엔티티를 조회해 변경 가능 항목을 갱신한다.
      *
-     * 흐름·정합: 식별자로 엔티티를 로드(없으면 404)하고, 클라이언트 version과 현재 version을 비교해
+     * 흐름·정합: 창고 코드로 엔티티를 로드(없으면 404)하고, 클라이언트 version과 현재 version을 비교해
      * 다르면 충돌(409)로 막는다(load-modify 방식이라 명시 비교가 분실 갱신 방지의 핵심). 변경 후 flush 시
      * @Version이 한 번 더 동시 수정을 검증하며, 그 실패도 409로 번역한다. 갱신된 읽기 모델로 재조회해 반환한다.
      */
     @Override
-    public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
-        WarehouseEntity entity = jpaDao.findById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
+        WarehouseEntity entity = jpaDao.findByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
 
         // version 이 다르면 수정 불가 - 낙관적 락
         if (!Objects.equals(entity.getVersion(), command.version())) {
@@ -88,8 +83,9 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
                     "창고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
         }
 
-        return jpaDao.findForEditById(id)
-                .orElseThrow(() -> new IllegalStateException("수정된 창고를 조회하지 못했습니다: " + id));
+        // code는 불변이라 갱신 후에도 동일한 코드로 읽기 모델을 재조회한다.
+        return jpaDao.findForEditByCode(code)
+                .orElseThrow(() -> new IllegalStateException("수정된 창고를 조회하지 못했습니다: " + code));
     }
 
     /**
@@ -97,9 +93,9 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
      * version 명시 비교로 충돌(409)을 막고, flush 시 @Version이 동시 수정을 한 번 더 검증한다.
      */
     @Override
-    public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
-        WarehouseEntity entity = jpaDao.findById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
+        WarehouseEntity entity = jpaDao.findByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
         if (!Objects.equals(entity.getVersion(), command.version())) {
             throw new OptimisticLockConflictException(
                     "창고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
@@ -111,8 +107,8 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
             throw new OptimisticLockConflictException(
                     "창고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
         }
-        return jpaDao.findForEditById(id)
-                .orElseThrow(() -> new IllegalStateException("전환된 창고를 조회하지 못했습니다: " + id));
+        return jpaDao.findForEditByCode(code)
+                .orElseThrow(() -> new IllegalStateException("전환된 창고를 조회하지 못했습니다: " + code));
     }
 
     /** 부분 일치 LIKE 패턴으로 변환한다(소문자화 + 양끝 와일드카드). 검색어가 없으면 null. */

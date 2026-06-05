@@ -10,12 +10,14 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForE
  */
 public record WarehouseActiveResponse(
         Long id,
+        String code,
         boolean active,
         Instant updatedAt,
         Long version
 ) {
 
     public static WarehouseActiveResponse from(WarehouseSummaryForEdit detail) {
-        return new WarehouseActiveResponse(detail.id(), detail.active(), detail.updatedAt(), detail.version());
+        return new WarehouseActiveResponse(
+                detail.id(), detail.code(), detail.active(), detail.updatedAt(), detail.version());
     }
 }

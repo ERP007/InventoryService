@@ -111,19 +111,19 @@ public class WarehouseService {
      * - version 불일치(동시 수정): OptimisticLockConflictException (409)
      */
     @Transactional
-    public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
+    public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
         Warehouse.validateBranchRule(command.type(), command.branchId());
         if (command.branchId() != null && !branchLocationRepository.existsById(command.branchId())) {
             throw new BranchNotFoundException(command.branchId());
         }
-        return warehouseRepository.update(id, command);
+        return warehouseRepository.update(code, command);
     }
 
     /**
      * 창고 활성 상태를 전환한다. 같은 값으로의 전환은 멱등(no-op)이라 변경 없이 현재 상태를 반환한다.
      *
      * 흐름:
-     * 1) 식별자로 현재 상태를 조회한다(없으면 404).
+     * 1) 창고 코드로 현재 상태를 조회한다(없으면 404).
      * 2) 요청 active가 현재와 같으면 no-op으로 현재 상태를 그대로 반환한다(version 비교 없음 — 멱등·재시도 안전).
      * 3) 다르면 영속성에 위임해 전환한다 — version 불일치는 409.
      *
@@ -134,12 +134,12 @@ public class WarehouseService {
      * - version 불일치(실제 전환 시): OptimisticLockConflictException (409)
      */
     @Transactional
-    public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
-        WarehouseSummaryForEdit current = warehouseRepository.findForEditById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
+        WarehouseSummaryForEdit current = warehouseRepository.findForEditByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
         if (current.active() == command.active()) {
             return current;
         }
-        return warehouseRepository.changeActive(id, command);
+        return warehouseRepository.changeActive(code, command);
     }
 }
