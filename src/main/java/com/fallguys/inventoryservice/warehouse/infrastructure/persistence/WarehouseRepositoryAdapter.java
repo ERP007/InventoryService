@@ -56,6 +56,11 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
         return jpaDao.findForEditById(id);
     }
 
+    @Override
+    public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
+        return jpaDao.findForEditByCode(code);
+    }
+
     /**
      * 영속 엔티티를 조회해 변경 가능 항목을 갱신한다.
      *

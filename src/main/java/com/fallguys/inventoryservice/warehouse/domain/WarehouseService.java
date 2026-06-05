@@ -80,7 +80,7 @@ public class WarehouseService {
      * 수정 모달 프리필을 위해 창고 단건을 상세 조회한다(소속 지점명·주소·version 포함).
      *
      * 흐름:
-     * 1) 식별자로 읽기 모델(WarehouseSummaryForEdit)을 조회한다.
+     * 1) 창고 코드로 읽기 모델(WarehouseSummaryForEdit)을 조회한다.
      * 2) 없으면 존재를 은닉하여 404로 막는다("없음"과 "소속 외"를 구분하지 않는다).
      *
      * 트랜잭션: 읽기 전용. 외부 호출 없음.
@@ -89,9 +89,9 @@ public class WarehouseService {
      * - 창고 없음/소속 외: WarehouseNotFoundException (404)
      */
     @Transactional(readOnly = true)
-    public WarehouseSummaryForEdit getById(Long id) {
-        return warehouseRepository.findForEditById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit getByCode(String code) {
+        return warehouseRepository.findForEditByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
     }
 
     /**

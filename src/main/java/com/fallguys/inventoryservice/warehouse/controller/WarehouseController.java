@@ -87,21 +87,21 @@ public class WarehouseController {
 
     /**
      * 창고 단건을 상세 조회한다. 수정 모달 프리필용이며 ADMIN·HQ_MANAGER만 호출 가능(그 외 Role은 403 FORBIDDEN).
-     * code는 read-only, version은 후속 수정 호출에 사용된다.
-     * id가 숫자가 아니면 400(INVALID_PARAMETER), 없거나 소속 외면 404(WAREHOUSE_NOT_FOUND, 존재 은닉)로 매핑된다.
+     * 창고 코드(code)로 조회하며 version은 후속 수정 호출에 사용된다.
+     * 없거나 소속 외면 404(WAREHOUSE_NOT_FOUND, 존재 은닉)로 매핑된다.
      */
     @Operation(
             summary = "창고 단건 조회",
-            description = "수정 모달 프리필을 위해 id로 창고 전체 필드를 조회한다(branchId·address·version 포함)."
+            description = "수정 모달 프리필을 위해 창고 코드로 전체 필드를 조회한다(branchId·address·version 포함)."
     )
-    @GetMapping("/{id}")
+    @GetMapping("/{code}")
     public WarehouseDetailResponse detail(
             @AuthenticationPrincipal Jwt jwt,
-            @Parameter(description = "창고 내부 PK")
-            @PathVariable Long id
+            @Parameter(description = "창고 코드 (예: WH-SE-001)")
+            @PathVariable String code
     ) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
-        WarehouseSummaryForEdit detail = warehouseService.getById(id);
+        WarehouseSummaryForEdit detail = warehouseService.getByCode(code);
         return WarehouseDetailResponse.from(detail);
     }
 

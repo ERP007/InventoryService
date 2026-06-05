@@ -111,29 +111,30 @@ class WarehouseServiceTest {
         assertThat(repository.savedWarehouse).isNull();
     }
 
-    // ---- getById ----
+    // ---- getByCode ----
 
     @Test
-    void getById는_조회된_상세_읽기모델을_반환한다() {
+    void getByCode는_조회된_상세_읽기모델을_반환한다() {
         StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
         repository.summaryForEdit = new WarehouseSummaryForEdit(
                 2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점", "서울 강남구",
                 true, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2025-11-02T14:30:00Z"), 5L);
         WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
 
-        WarehouseSummaryForEdit result = service.getById(2L);
+        WarehouseSummaryForEdit result = service.getByCode("WH-SE-001");
 
-        assertThat(result.id()).isEqualTo(2L);
+        assertThat(result.code()).isEqualTo("WH-SE-001");
         assertThat(result.branchId()).isEqualTo(3L);
         assertThat(result.version()).isEqualTo(5L);
+        assertThat(repository.findForEditCodeArg).isEqualTo("WH-SE-001");
     }
 
     @Test
-    void getById는_없으면_WarehouseNotFoundException을_던진다() {
+    void getByCode는_없으면_WarehouseNotFoundException을_던진다() {
         WarehouseService service = new WarehouseService(
                 new StubWarehouseRepository(List.of()), new StubBranchLocationRepository(true));
 
-        assertThatThrownBy(() -> service.getById(999L))
+        assertThatThrownBy(() -> service.getByCode("NOPE"))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
@@ -228,6 +229,7 @@ class WarehouseServiceTest {
         private Warehouse savedWarehouse;
         private WarehouseSummary summaryAfterSave;
         private WarehouseSummaryForEdit summaryForEdit;
+        private String findForEditCodeArg;
         private WarehouseSummaryForEdit updatedResult;
         private Long updateIdArg;
         private UpdateWarehouseCommand updateCommandArg;
@@ -262,6 +264,12 @@ class WarehouseServiceTest {
 
         @Override
         public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
+            return Optional.ofNullable(summaryForEdit);
+        }
+
+        @Override
+        public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
+            this.findForEditCodeArg = code;
             return Optional.ofNullable(summaryForEdit);
         }
 

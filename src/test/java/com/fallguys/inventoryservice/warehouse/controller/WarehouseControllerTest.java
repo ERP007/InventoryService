@@ -199,11 +199,11 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_CODE_DUPLICATE"));
     }
 
-    // ---- GET /{id} (단건 조회) : ADMIN·HQ_MANAGER ----
+    // ---- GET /{code} (단건 조회) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 단건조회는_200과_전체필드_branchId_address_version을_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.ADMIN)))
+        mockMvc.perform(get("/inventory/warehouses/WH-SE-001").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.code").value("WH-SE-001"))
@@ -216,25 +216,17 @@ class WarehouseControllerTest {
 
     @Test
     void 단건조회는_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.BRANCH_STAFF)))
+        mockMvc.perform(get("/inventory/warehouses/WH-SE-001").with(roleJwt(UserRole.BRANCH_STAFF)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
     }
 
     @Test
-    void 없는_창고는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/999").with(roleJwt(UserRole.ADMIN)))
+    void 없는_코드는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/NOPE-999").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"))
                 .andExpect(jsonPath("$.timestamp").exists());
-    }
-
-    @Test
-    void id가_숫자가_아니면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/abc").with(roleJwt(UserRole.ADMIN)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
-                .andExpect(jsonPath("$.details[0].field").value("id"));
     }
 
     // ---- PUT /{id} (수정) : ADMIN·HQ_MANAGER ----
@@ -469,6 +461,17 @@ class WarehouseControllerTest {
                 @Override
                 public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
                     if (id != null && id == 2L) {
+                        return Optional.of(new WarehouseSummaryForEdit(
+                                2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점",
+                                "서울 강남구 테헤란로 521", true,
+                                Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2025-11-02T14:30:00Z"), 5L));
+                    }
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
+                    if ("WH-SE-001".equals(code)) {
                         return Optional.of(new WarehouseSummaryForEdit(
                                 2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점",
                                 "서울 강남구 테헤란로 521", true,

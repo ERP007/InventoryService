@@ -123,6 +123,25 @@ class WarehouseRepositoryAdapterTest {
     }
 
     @Test
+    void findForEditByCode는_branchId_address_version까지_조인하여_반환한다() {
+        WarehouseSummaryForEdit detail = adapter.findForEditByCode("HW-SE-001").orElseThrow();
+
+        assertThat(detail.id()).isEqualTo(2L);
+        assertThat(detail.code()).isEqualTo("HW-SE-001");
+        assertThat(detail.type()).isEqualTo(WarehouseType.DEALER);
+        assertThat(detail.branchId()).isEqualTo(10L);
+        assertThat(detail.branchName()).isEqualTo("서울 강남지점");
+        assertThat(detail.address()).isEqualTo("서울 어딘가");
+        assertThat(detail.active()).isTrue();
+        assertThat(detail.version()).isEqualTo(0L);
+    }
+
+    @Test
+    void findForEditByCode는_없는_code면_empty를_반환한다() {
+        assertThat(adapter.findForEditByCode("NOPE-999")).isEmpty();
+    }
+
+    @Test
     void update는_변경항목을_수정하고_version과_updatedAt을_올린다() {
         WarehouseSummaryForEdit result = adapter.update(2L,
                 new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 10L, "새 주소", 0L));

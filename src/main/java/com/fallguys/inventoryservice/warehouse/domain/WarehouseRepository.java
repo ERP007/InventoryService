@@ -31,6 +31,9 @@ public interface WarehouseRepository {
     /** 식별자로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
     Optional<WarehouseSummaryForEdit> findForEditById(Long id);
 
+    /** 창고 코드로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
+    Optional<WarehouseSummaryForEdit> findForEditByCode(String code);
+
     /**
      * 변경 가능 항목을 수정하고 갱신된 읽기 모델을 반환한다.
      * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).

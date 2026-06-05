@@ -11,4 +11,8 @@ public class WarehouseNotFoundException extends ResourceNotFoundException {
     public WarehouseNotFoundException(Long id) {
         super(WarehouseErrorCode.WAREHOUSE_NOT_FOUND.getCode(), "창고를 찾을 수 없습니다: " + id);
     }
+
+    public WarehouseNotFoundException(String code) {
+        super(WarehouseErrorCode.WAREHOUSE_NOT_FOUND.getCode(), "창고를 찾을 수 없습니다: " + code);
+    }
 }
