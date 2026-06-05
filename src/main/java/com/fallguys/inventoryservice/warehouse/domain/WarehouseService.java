@@ -14,6 +14,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
@@ -39,6 +40,17 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseSummary> search(WarehouseSearchQuery query) {
         return warehouseRepository.search(query);
+    }
+
+    /**
+     * 출고 창고 선택 드롭다운용으로 활성(active=true) 본사(type=HQ) 창고를 슬림 모델로 조회한다.
+     *
+     * 흐름: 영속성에서 활성·HQ 조건으로 필터링된 목록을 code 오름차순으로 가져온다.
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 권한 분기 없음(전 Role 동일 결과). 매칭 0건이면 빈 리스트.
+     */
+    @Transactional(readOnly = true)
+    public List<WarehouseHqSummary> findHqWarehouses() {
+        return warehouseRepository.findActiveHq();
     }
 
     /**

@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -18,6 +19,9 @@ public interface WarehouseRepository {
      * 조회 조건에 맞는 창고 목록을 정렬하여 반환한다. 매칭이 없으면 빈 리스트.
      */
     List<WarehouseSummary> search(WarehouseSearchQuery query);
+
+    /** 출고 창고 선택용: 활성(active=true) 본사(type=HQ) 창고를 code 오름차순 슬림 모델로 반환한다. 0건이면 빈 리스트. */
+    List<WarehouseHqSummary> findActiveHq();
 
     /** 창고 코드 존재 여부. 등록 전 중복 검사에 사용한다. */
     boolean existsByCode(String code);
