@@ -33,9 +33,9 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/inventory/health",
             "/actuator/health",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/v3/api-docs/**"
+            "/inventory/swagger-ui/**",
+            "/inventory/swagger-ui.html",
+            "/inventory/v3/api-docs/**"
     };
 
     @Bean

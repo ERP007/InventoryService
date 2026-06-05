@@ -19,3 +19,9 @@ spring:
       hibernate:
         format_sql: true
     open-in-view: false
+
+springdoc:
+  api-docs:
+    path: /inventory/v3/api-docs
+  swagger-ui:
+    path: /inventory/swagger-ui.html
