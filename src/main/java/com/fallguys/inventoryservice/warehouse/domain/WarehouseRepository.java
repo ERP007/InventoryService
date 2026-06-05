@@ -25,21 +25,21 @@ public interface WarehouseRepository {
     /** 신규 창고를 저장하고 발급된 식별자를 반환한다. */
     Long save(Warehouse warehouse);
 
-    /** 식별자로 창고 읽기 모델(소속 지점명 포함)을 조회한다. 없으면 empty. */
+    /** 저장 직후 발급된 식별자로 창고 읽기 모델(소속 지점명 포함)을 조회한다(등록 응답 구성용). 없으면 empty. */
     Optional<WarehouseSummary> findSummaryById(Long id);
 
-    /** 식별자로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
-    Optional<WarehouseSummaryForEdit> findForEditById(Long id);
+    /** 창고 코드로 창고 읽기 모델(소속 지점명, 주소, 버전)을 조회한다. 없으면 empty */
+    Optional<WarehouseSummaryForEdit> findForEditByCode(String code);
 
     /**
-     * 변경 가능 항목을 수정하고 갱신된 읽기 모델을 반환한다.
+     * 창고 코드로 식별한 창고의 변경 가능 항목을 수정하고 갱신된 읽기 모델을 반환한다.
      * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).
      */
-    WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command);
+    WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command);
 
     /**
-     * 활성 상태를 전환하고 갱신된 읽기 모델을 반환한다(실제 상태 변경이 있는 경우만 호출된다).
+     * 창고 코드로 식별한 창고의 활성 상태를 전환하고 갱신된 읽기 모델을 반환한다(실제 상태 변경이 있는 경우만 호출된다).
      * 창고가 없으면 WarehouseNotFoundException(404), version이 현재와 다르면 OptimisticLockConflictException(409).
      */
-    WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command);
+    WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command);
 }

@@ -199,11 +199,11 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_CODE_DUPLICATE"));
     }
 
-    // ---- GET /{id} (단건 조회) : ADMIN·HQ_MANAGER ----
+    // ---- GET /{code} (단건 조회) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 단건조회는_200과_전체필드_branchId_address_version을_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.ADMIN)))
+        mockMvc.perform(get("/inventory/warehouses/WH-SE-001").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.code").value("WH-SE-001"))
@@ -216,32 +216,24 @@ class WarehouseControllerTest {
 
     @Test
     void 단건조회는_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/2").with(roleJwt(UserRole.BRANCH_STAFF)))
+        mockMvc.perform(get("/inventory/warehouses/WH-SE-001").with(roleJwt(UserRole.BRANCH_STAFF)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
     }
 
     @Test
-    void 없는_창고는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/999").with(roleJwt(UserRole.ADMIN)))
+    void 없는_코드는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/NOPE-999").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"))
                 .andExpect(jsonPath("$.timestamp").exists());
-    }
-
-    @Test
-    void id가_숫자가_아니면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(get("/inventory/warehouses/abc").with(roleJwt(UserRole.ADMIN)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
-                .andExpect(jsonPath("$.details[0].field").value("id"));
     }
 
     // ---- PUT /{id} (수정) : ADMIN·HQ_MANAGER ----
 
     @Test
     void 정상수정은_200과_갱신된_창고_version증가를_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -257,7 +249,7 @@ class WarehouseControllerTest {
 
     @Test
     void 수정은_권한없는_BRANCH_MANAGER면_403과_FORBIDDEN을_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.BRANCH_MANAGER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -269,7 +261,7 @@ class WarehouseControllerTest {
 
     @Test
     void code를_포함하면_400과_WAREHOUSE_CODE_IMMUTABLE을_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -281,7 +273,7 @@ class WarehouseControllerTest {
 
     @Test
     void HQ인데_branchId가_있으면_400과_WAREHOUSE_BRANCH_RULE을_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -293,7 +285,7 @@ class WarehouseControllerTest {
 
     @Test
     void 수정시_존재하지_않는_branchId는_400과_BRANCH_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -305,7 +297,7 @@ class WarehouseControllerTest {
 
     @Test
     void version이_없으면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -318,7 +310,7 @@ class WarehouseControllerTest {
 
     @Test
     void 없는_창고_수정은_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/999")
+        mockMvc.perform(put("/inventory/warehouses/NOPE-999")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -330,7 +322,7 @@ class WarehouseControllerTest {
 
     @Test
     void version이_불일치하면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
-        mockMvc.perform(put("/inventory/warehouses/2")
+        mockMvc.perform(put("/inventory/warehouses/WH-SE-001")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -344,7 +336,7 @@ class WarehouseControllerTest {
 
     @Test
     void 활성전환은_200과_변경된_active_version증가를_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -352,6 +344,7 @@ class WarehouseControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.code").value("WH-SE-001"))
                 .andExpect(jsonPath("$.active").value(false))
                 .andExpect(jsonPath("$.version").value(6))
                 .andExpect(jsonPath("$.updatedAt").exists());
@@ -359,7 +352,7 @@ class WarehouseControllerTest {
 
     @Test
     void 활성전환은_권한없는_HQ_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.HQ_STAFF))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -371,7 +364,7 @@ class WarehouseControllerTest {
 
     @Test
     void 같은_값으로의_전환은_멱등_no_op_200이며_version이_그대로다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -384,7 +377,7 @@ class WarehouseControllerTest {
 
     @Test
     void active가_없으면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -397,7 +390,7 @@ class WarehouseControllerTest {
 
     @Test
     void active_형식이_틀리면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -409,7 +402,7 @@ class WarehouseControllerTest {
 
     @Test
     void 없는_창고_전환은_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/999/active")
+        mockMvc.perform(patch("/inventory/warehouses/NOPE-999/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -421,7 +414,7 @@ class WarehouseControllerTest {
 
     @Test
     void 전환시_version이_불일치하면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
-        mockMvc.perform(patch("/inventory/warehouses/2/active")
+        mockMvc.perform(patch("/inventory/warehouses/WH-SE-001/active")
                         .with(roleJwt(UserRole.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -467,8 +460,8 @@ class WarehouseControllerTest {
                 }
 
                 @Override
-                public Optional<WarehouseSummaryForEdit> findForEditById(Long id) {
-                    if (id != null && id == 2L) {
+                public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
+                    if ("WH-SE-001".equals(code)) {
                         return Optional.of(new WarehouseSummaryForEdit(
                                 2L, "WH-SE-001", "서울 1창고", WarehouseType.DEALER, 3L, "서울 강남지점",
                                 "서울 강남구 테헤란로 521", true,
@@ -478,9 +471,9 @@ class WarehouseControllerTest {
                 }
 
                 @Override
-                public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
-                    if (id == null || id != 2L) {
-                        throw new WarehouseNotFoundException(id);
+                public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
+                    if (!"WH-SE-001".equals(code)) {
+                        throw new WarehouseNotFoundException(code);
                     }
                     if (!command.version().equals(5L)) {
                         throw new OptimisticLockConflictException("conflict");
@@ -494,7 +487,7 @@ class WarehouseControllerTest {
                 }
 
                 @Override
-                public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
+                public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
                     if (!command.version().equals(5L)) {
                         throw new OptimisticLockConflictException("conflict");
                     }
