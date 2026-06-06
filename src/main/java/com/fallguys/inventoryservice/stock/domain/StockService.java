@@ -4,11 +4,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
@@ -41,6 +44,31 @@ public class StockService {
                 ? query.withWarehouseCodes(List.of(tenancyCode))
                 : query;
         return stockRepository.search(effective);
+    }
+
+    /**
+     * SO 발주 라인 추가 시 (창고 × 부품)의 현재고·안전재고를 조회한다. BRANCH 사용자 전용(인가는 컨트롤러).
+     *
+     * 흐름:
+     * 1) 호출자의 담당 창고(tenancy_code)와 요청 warehouseCode를 동등 비교한다(외부 호출 없음).
+     *    다르면 타 창고 존재를 은닉하기 위해 404(StockNotFoundException).
+     * 2) (warehouseCode × sku) 재고 행을 조회한다. 있으면 그 값을, 없으면 quantity=0·safetyStock=0으로 응답한다(빈 stock).
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음.
+     *
+     * 예외:
+     * - 담당 창고 불일치(존재 은닉): StockNotFoundException (404)
+     *
+     * TODO(Item 연동): sku가 Item 마스터에 없으면 404(STOCK_NOT_FOUND),
+     *  빈 stock의 safetyStock은 Item 마스터 기본값으로 fallback. 현재는 검증 생략 + 0으로 응답.
+     */
+    @Transactional(readOnly = true)
+    public StockDetail getDetail(String warehouseCode, String sku, String tenancyCode) {
+        if (!Objects.equals(tenancyCode, warehouseCode)) {
+            throw new StockNotFoundException(warehouseCode, sku);
+        }
+        return stockRepository.findDetailByWarehouseCodeAndSku(warehouseCode, sku)
+                .orElseGet(() -> new StockDetail(warehouseCode, sku, 0, 0));
     }
 
     /**

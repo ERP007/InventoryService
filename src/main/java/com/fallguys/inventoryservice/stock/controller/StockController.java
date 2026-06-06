@@ -1,24 +1,32 @@
 package com.fallguys.inventoryservice.stock.controller;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
+import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.StockDetailResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockListResponse;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
@@ -68,6 +76,45 @@ public class StockController {
         String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
         StockSummaryPage result = stockService.search(query, tenancyType, tenancyCode);
         return ResponseEntity.ok(StockListResponse.from(result));
+    }
+
+    /**
+     * (창고 × 부품)의 현재고·안전재고를 조회한다. SO 발주 라인 추가 시 사용하며 BRANCH_* 전용(그 외 Role은 403 FORBIDDEN).
+     * 자기 담당 창고(tenancy_code)가 아닌 코드로 호출 시 404(STOCK_NOT_FOUND, 존재 은닉), path가 빈 문자열이면 400.
+     * 재고 행이 아직 없으면 quantity=0·safetyStock=0으로 200을 반환한다(빈 stock).
+     */
+    @Operation(
+            summary = "단건 재고 조회(창고×부품)",
+            description = "SO 발주 라인 추가용. BRANCH_* 전용이며 자기 담당 창고만 조회 가능하다. "
+                    + "재고 행이 없으면 quantity=0·safetyStock=0으로 응답한다."
+    )
+    @GetMapping("/{warehouseCode}/{sku}")
+    public ResponseEntity<StockDetailResponse> detail(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "창고 비즈니스 코드 (예: WH-SE-001)")
+            @PathVariable String warehouseCode,
+            @Parameter(description = "부품 코드 (예: EO-5W30-1L)")
+            @PathVariable String sku
+    ) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.BRANCH_MANAGER, UserRole.BRANCH_STAFF);
+        requireNotBlank(warehouseCode, sku);
+        String tenancyCode = JwtClaimExtractor.extractTenancyCode(jwt);
+        StockDetail detail = stockService.getDetail(warehouseCode, sku, tenancyCode);
+        return ResponseEntity.ok(StockDetailResponse.from(detail));
+    }
+
+    /** path 변수 형식 검증(빈 문자열 금지). 위반 시 400(INVALID_PARAMETER). */
+    private static void requireNotBlank(String warehouseCode, String sku) {
+        List<ParameterViolation> violations = new ArrayList<>();
+        if (warehouseCode == null || warehouseCode.isBlank()) {
+            violations.add(new ParameterViolation("warehouseCode", warehouseCode, List.of()));
+        }
+        if (sku == null || sku.isBlank()) {
+            violations.add(new ParameterViolation("sku", sku, List.of()));
+        }
+        if (!violations.isEmpty()) {
+            throw new InvalidParameterException(violations);
+        }
     }
 
     /**

@@ -14,6 +14,7 @@ import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
@@ -54,6 +55,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public Optional<StockCreateResult> findResultById(Long id) {
         return jpaDao.findResultById(id);
+    }
+
+    @Override
+    public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
+        return jpaDao.findDetailByWarehouseCodeAndSku(warehouseCode, sku);
     }
 
     /**

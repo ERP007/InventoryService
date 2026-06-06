@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 
 public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
@@ -71,4 +72,19 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             WHERE s.id = :id
             """)
     Optional<StockCreateResult> findResultById(@Param("id") Long id);
+
+    /**
+     * (창고 코드 × sku) 단건 재고를 조회한다(SO 발주 라인 표시용).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인해 창고 코드로 식별한다.
+     * 재고 행이 없으면 결과가 비어 빈 stock(0/0) fallback은 서비스가 결정한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockDetail(
+                w.code, s.sku, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE w.code = :warehouseCode AND s.sku = :sku
+            """)
+    Optional<StockDetail> findDetailByWarehouseCodeAndSku(
+            @Param("warehouseCode") String warehouseCode, @Param("sku") String sku);
 }
