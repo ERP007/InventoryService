@@ -9,9 +9,12 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
@@ -65,10 +68,39 @@ class StockServiceTest {
         assertThat(stockRepository.saved).isNull();
     }
 
+    @Test
+    void search_BRANCH는_요청_창고필터를_무시하고_자기_창고로_강제한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+        StockSearchQuery query = StockSearchQuery.of(null, "WH-OTHER,HQ-001", null, null, null, null);
+
+        service.search(query, TenancyType.BRANCH, "WH-SE-001");
+
+        assertThat(stockRepository.searchArg.warehouseCodes()).containsExactly("WH-SE-001");
+    }
+
+    @Test
+    void search_ADMIN은_요청_창고필터를_그대로_사용한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+        StockSearchQuery query = StockSearchQuery.of(null, "WH-SE-001,HQ-001", null, null, null, null);
+
+        service.search(query, TenancyType.ADMIN, null);
+
+        assertThat(stockRepository.searchArg.warehouseCodes()).containsExactly("WH-SE-001", "HQ-001");
+    }
+
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
         private Stock saved;
         private Long savedWarehouseId;
+        private StockSearchQuery searchArg;
+
+        @Override
+        public StockSummaryPage search(StockSearchQuery query) {
+            this.searchArg = query;
+            return new StockSummaryPage(List.of(), query.page(), query.size(), 0, 0);
+        }
 
         @Override
         public boolean existsBySkuAndWarehouseId(String sku, Long warehouseId) {

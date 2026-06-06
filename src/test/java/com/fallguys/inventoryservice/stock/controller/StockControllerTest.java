@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.stock.controller;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +28,9 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
+import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
@@ -47,8 +51,65 @@ class StockControllerTest {
     private static RequestPostProcessor roleJwt(UserRole role) {
         return jwt().jwt(token -> token
                 .claim("employee_no", "tester")
-                .claim("user_role", role.name()));
+                .claim("user_role", role.name())
+                .claim("tenancy_type", tenancyTypeOf(role))
+                .claim("tenancy_code", "WH-SE-001"));
     }
+
+    private static String tenancyTypeOf(UserRole role) {
+        if (role.name().startsWith("HQ")) {
+            return "HQ";
+        }
+        if (role.name().startsWith("BRANCH")) {
+            return "BRANCH";
+        }
+        return "ADMIN";
+    }
+
+    // ---- GET (목록 조회) : 전체 Role, Tenancy 차등 ----
+
+    @Test
+    void 목록조회는_200과_content_파생status_페이지메타를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1001))
+                .andExpect(jsonPath("$.content[0].sku").value("HMC-EN-00214"))
+                .andExpect(jsonPath("$.content[0].warehouseCode").value("WH-SE-001"))
+                .andExpect(jsonPath("$.content[0].warehouseName").value("서울 1창고"))
+                .andExpect(jsonPath("$.content[0].quantity").value(48))
+                .andExpect(jsonPath("$.content[0].safetyStock").value(50))
+                .andExpect(jsonPath("$.content[0].status").value("LOW"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(42))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.hasPrevious").value(false))
+                .andExpect(jsonPath("$.hasNext").value(true));
+    }
+
+    @Test
+    void 목록조회는_가장_낮은_BRANCH_STAFF도_200으로_조회된다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 허용되지_않는_sort는_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks").param("sort", "price,asc").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("sort"));
+    }
+
+    @Test
+    void 허용되지_않는_size는_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks").param("size", "33").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("size"));
+    }
+
+    // ---- POST (생성) : ADMIN 전용 ----
 
     @Test
     void 정상생성은_201과_생성된_재고와_파생status를_반환한다() throws Exception {
@@ -146,6 +207,14 @@ class StockControllerTest {
         StockService stockService() {
             StockRepository stockRepository = new StockRepository() {
                 private Stock saved;
+
+                @Override
+                public StockSummaryPage search(StockSearchQuery query) {
+                    StockSummary item = new StockSummary(
+                            1001L, "HMC-EN-00214", "엔진오일 필터", 2L, "WH-SE-001", "서울 1창고",
+                            48, 50, Instant.parse("2026-05-20T14:22:00Z"));
+                    return new StockSummaryPage(List.of(item), query.page(), query.size(), 42, 3);
+                }
 
                 @Override
                 public boolean existsBySkuAndWarehouseId(String sku, Long warehouseId) {
