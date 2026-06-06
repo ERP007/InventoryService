@@ -28,6 +28,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
@@ -107,6 +108,41 @@ class StockControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.details[0].field").value("size"));
+    }
+
+    // ---- GET /{warehouseCode}/{sku} (단건) : BRANCH_* 전용, 자기 창고만 ----
+
+    @Test
+    void 단건조회는_200과_현재고_안전재고를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/EO-5W30-1L").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warehouseCode").value("WH-SE-001"))
+                .andExpect(jsonPath("$.sku").value("EO-5W30-1L"))
+                .andExpect(jsonPath("$.quantity").value(48))
+                .andExpect(jsonPath("$.safetyStock").value(50));
+    }
+
+    @Test
+    void 재고행이_없으면_200과_quantity0_safetyStock0을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/UNREGISTERED").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(0))
+                .andExpect(jsonPath("$.safetyStock").value(0));
+    }
+
+    @Test
+    void 단건조회는_BRANCH가_아닌_ADMIN이면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/EO-5W30-1L").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 자기_담당이_아닌_창고면_404와_STOCK_NOT_FOUND를_반환한다() throws Exception {
+        // roleJwt의 tenancy_code=WH-SE-001 인데 다른 창고 코드로 호출 → 존재 은닉 404
+        mockMvc.perform(get("/inventory/stocks/WH-OTHER-999/EO-5W30-1L").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
     }
 
     // ---- POST (생성) : ADMIN 전용 ----
@@ -214,6 +250,14 @@ class StockControllerTest {
                             1001L, "HMC-EN-00214", "엔진오일 필터", 2L, "WH-SE-001", "서울 1창고",
                             48, 50, Instant.parse("2026-05-20T14:22:00Z"));
                     return new StockSummaryPage(List.of(item), query.page(), query.size(), 42, 3);
+                }
+
+                @Override
+                public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
+                    if ("WH-SE-001".equals(warehouseCode) && "EO-5W30-1L".equals(sku)) {
+                        return Optional.of(new StockDetail("WH-SE-001", "EO-5W30-1L", 48, 50));
+                    }
+                    return Optional.empty();
                 }
 
                 @Override

@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
@@ -90,16 +92,60 @@ class StockServiceTest {
         assertThat(stockRepository.searchArg.warehouseCodes()).containsExactly("WH-SE-001", "HQ-001");
     }
 
+    @Test
+    void getDetail_담당창고가_아니면_StockNotFoundException을_던진다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+
+        // tenancy_code(WH-SE-001) != 요청 warehouseCode(WH-OTHER) → 404 은닉
+        assertThatThrownBy(() -> service.getDetail("WH-OTHER", "EO-5W30-1L", "WH-SE-001"))
+                .isInstanceOf(StockNotFoundException.class);
+        assertThat(stockRepository.detailQueried).isFalse();
+    }
+
+    @Test
+    void getDetail_재고행이_있으면_그_값을_반환한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        stockRepository.detailResult = new StockDetail("WH-SE-001", "EO-5W30-1L", 48, 50);
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+
+        StockDetail detail = service.getDetail("WH-SE-001", "EO-5W30-1L", "WH-SE-001");
+
+        assertThat(detail.quantity()).isEqualTo(48);
+        assertThat(detail.safetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void getDetail_재고행이_없으면_quantity0_safetyStock0으로_응답한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+
+        StockDetail detail = service.getDetail("WH-SE-001", "UNKNOWN-SKU", "WH-SE-001");
+
+        assertThat(detail.warehouseCode()).isEqualTo("WH-SE-001");
+        assertThat(detail.sku()).isEqualTo("UNKNOWN-SKU");
+        assertThat(detail.quantity()).isZero();
+        assertThat(detail.safetyStock()).isZero();
+    }
+
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
         private Stock saved;
         private Long savedWarehouseId;
         private StockSearchQuery searchArg;
+        private StockDetail detailResult;
+        private boolean detailQueried = false;
 
         @Override
         public StockSummaryPage search(StockSearchQuery query) {
             this.searchArg = query;
             return new StockSummaryPage(List.of(), query.page(), query.size(), 0, 0);
+        }
+
+        @Override
+        public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
+            this.detailQueried = true;
+            return Optional.ofNullable(detailResult);
         }
 
         @Override

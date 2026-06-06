@@ -17,6 +17,7 @@ import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
@@ -151,6 +152,25 @@ class StockRepositoryAdapterTest {
         StockSummaryPage page2 = adapter.search(
                 query(null, List.of(), null, StockSortField.QUANTITY, SortDirection.DESC, 2, 2));
         assertThat(page2.content()).extracting(StockSummary::quantity).containsExactly(30, 0);
+    }
+
+    @Test
+    void findDetailByWarehouseCodeAndSku는_창고코드와_sku로_단건을_반환한다() {
+        seedStocks();
+
+        StockDetail detail = adapter.findDetailByWarehouseCodeAndSku("WH-SE-001", "HMC-EN-00214").orElseThrow();
+
+        assertThat(detail.warehouseCode()).isEqualTo("WH-SE-001");
+        assertThat(detail.sku()).isEqualTo("HMC-EN-00214");
+        assertThat(detail.quantity()).isEqualTo(120);
+        assertThat(detail.safetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findDetailByWarehouseCodeAndSku는_재고행이_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findDetailByWarehouseCodeAndSku("WH-SE-001", "NO-SUCH-SKU")).isEmpty();
     }
 
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,
