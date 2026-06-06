@@ -1,14 +1,58 @@
 package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 
 public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
+
+    /**
+     * 조회 조건으로 재고를 검색해 읽기 모델(StockSummary)로 투영한다.
+     *
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인해 창고 코드·이름을 가져온다.
+     * 필터(각 조건은 파라미터로 on/off):
+     *   - keyword: 부품명/SKU 부분 일치(대소문자 무시, 호출부가 소문자 LIKE 패턴을 만들어 전달).
+     *   - warehouseCodes: hasWarehouseFilter=true일 때만 w.code IN 으로 제한.
+     *   - status: 'NORMAL'/'LOW'/'OUT' 문자열을 현재고·안전재고 비교로 번역(파생 상태를 SQL로 표현).
+     * 정렬·페이지: Pageable로 위임(정렬식은 어댑터가 화이트리스트로 구성, id tie-breaker 포함).
+     */
+    @Query(value = """
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSummary(
+                s.id, s.sku, s.itemName, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, s.updatedAt)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+              AND (:status IS NULL
+                   OR (:status = 'OUT' AND s.currentStock = 0)
+                   OR (:status = 'LOW' AND s.currentStock > 0 AND s.currentStock < s.safetyStock)
+                   OR (:status = 'NORMAL' AND s.currentStock > 0 AND s.currentStock >= s.safetyStock))
+            """,
+            countQuery = """
+            SELECT COUNT(s)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+              AND (:status IS NULL
+                   OR (:status = 'OUT' AND s.currentStock = 0)
+                   OR (:status = 'LOW' AND s.currentStock > 0 AND s.currentStock < s.safetyStock)
+                   OR (:status = 'NORMAL' AND s.currentStock > 0 AND s.currentStock >= s.safetyStock))
+            """)
+    Page<StockSummary> search(
+            @Param("keyword") String keyword,
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes,
+            @Param("status") String status,
+            Pageable pageable);
 
     /** (sku × warehouse) 재고 존재 여부(등록 전 중복 검사). */
     boolean existsBySkuAndWarehouseId(String sku, Long warehouseId);

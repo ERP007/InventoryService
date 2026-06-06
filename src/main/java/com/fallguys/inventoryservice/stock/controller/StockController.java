@@ -4,19 +4,26 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.StockListResponse;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
+import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +35,40 @@ import lombok.RequiredArgsConstructor;
 public class StockController {
 
     private final StockService stockService;
+
+    /**
+     * 재고 목록을 조회한다. 전 Role 호출 가능하나 Tenancy로 범위가 차등된다 — BRANCH는 자기 창고(tenancy_code) 재고만 본다.
+     * 검색·창고 다중 필터·상태 필터·정렬·페이지네이션을 지원한다. 매칭 0건이어도 200과 빈 배열을 반환한다.
+     * status/sort/page/size가 허용치 밖이면 400(INVALID_PARAMETER)로 매핑된다.
+     */
+    @Operation(
+            summary = "재고 목록 조회",
+            description = "부품명/SKU 검색, 창고 다중 필터(콤마 구분), 상태(NORMAL/LOW/OUT) 필터, 정렬, 페이지네이션. "
+                    + "BRANCH 사용자는 자기 지점 창고 재고만 조회된다."
+    )
+    @GetMapping
+    public ResponseEntity<StockListResponse> list(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "부품명 또는 SKU 부분 일치")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "창고 코드 다중 필터(콤마 구분, 예: WH-SE-001,HQ-001)")
+            @RequestParam(required = false) String warehouseCodes,
+            @Parameter(description = "재고 상태 필터: NORMAL / LOW / OUT")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "정렬(기본 name,asc). 속성: name/quantity/safetyRatio/lastAdjustedAt, 방향: asc/desc", example = "name,asc")
+            @RequestParam(required = false) String sort,
+            @Parameter(description = "페이지(1-base, 기본 1)")
+            @RequestParam(required = false) Integer page,
+            @Parameter(description = "페이지 크기(20/50/100 중, 기본 20)")
+            @RequestParam(required = false) Integer size
+    ) {
+        StockSearchQuery query = StockSearchQuery.of(keyword, warehouseCodes, status, sort, page, size);
+        TenancyType tenancyType = JwtClaimExtractor.extractTenancyType(jwt);
+        // BRANCH만 자기 창고로 한정하므로 그때만 tenancy_code를 요구한다(ADMIN/HQ는 전사라 불필요).
+        String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
+        StockSummaryPage result = stockService.search(query, tenancyType, tenancyCode);
+        return ResponseEntity.ok(StockListResponse.from(result));
+    }
 
     /**
      * (sku × warehouse) 재고 행을 신규 생성한다. ADMIN 전용(그 외 Role은 403 FORBIDDEN).
