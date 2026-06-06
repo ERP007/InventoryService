@@ -2,8 +2,6 @@ package com.fallguys.inventoryservice.shared.security;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -67,8 +65,9 @@ public class SecurityConfig {
 
     /**
      * 로컬 전용 디코더(Keycloak 없이 Swagger로 인가 테스트). spring.profiles.active=local 일 때만 활성화된다.
-     * 서명을 검증하지 않고 Bearer 토큰 문자열을 그대로 Role로 사용한다.
-     * 예) Swagger Authorize에 'ADMIN' 입력 → ADMIN, 'BRANCH_STAFF' 입력 → 쓰기에서 403, 미입력 → 401.
+     * 서명을 검증하지 않고 Bearer 토큰 문자열을 클레임으로 펼친다.
+     * 형식: {@code ROLE} 또는 {@code ROLE@TENANCY_CODE}.
+     * 예) {@code ADMIN} → 전사 / {@code BRANCH_STAFF@WH-SE-001} → BRANCH·창고 WH-SE-001 / 미입력 → 401.
      *
      * 주의: 서명 검증이 없으므로 절대 운영(local 외 프로파일)에서 활성화하지 않는다.
      */
@@ -76,14 +75,32 @@ public class SecurityConfig {
     @Profile("local")
     public JwtDecoder localRoleJwtDecoder() {
         return token -> {
+            String[] parts = token.split("@", 2);
+            String role = parts[0];
+            // tenancy_code 미지정 시 role을 그대로 사용(ADMIN/HQ 전사는 어차피 코드 비교를 안 함).
+            String tenancyCode = parts.length > 1 ? parts[1] : role;
             Instant now = Instant.now();
             return Jwt.withTokenValue(token)
                     .header("alg", "none")
-                    .claim("preferred_username", "local-" + token)
-                    .claim("resource_access", Map.of("erp-client", Map.of("roles", List.of(token))))
+                    .claim("employee_no", "local-" + role)
+                    .claim("preferred_username", "local-" + role)
+                    .claim("user_role", role)
+                    .claim("tenancy_type", localTenancyType(role))
+                    .claim("tenancy_code", tenancyCode)
                     .issuedAt(now)
                     .expiresAt(now.plus(1, ChronoUnit.HOURS))
                     .build();
         };
+    }
+
+    /** 로컬 디코더용: user_role 접두어로 tenancy_type을 유추한다(HQ_* → HQ, BRANCH_* → BRANCH, 그 외 → ADMIN). */
+    private static String localTenancyType(String role) {
+        if (role.startsWith("HQ")) {
+            return "HQ";
+        }
+        if (role.startsWith("BRANCH")) {
+            return "BRANCH";
+        }
+        return "ADMIN";
     }
 }
