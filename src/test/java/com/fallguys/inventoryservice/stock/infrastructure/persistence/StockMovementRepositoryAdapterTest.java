@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
+import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
@@ -152,6 +153,29 @@ class StockMovementRepositoryAdapterTest {
                 WIDE_FROM, WIDE_TO, MovementSortField.OCCURRED_AT, SortDirection.DESC, 1, 20));
 
         assertThat(page.content().get(0).itemName()).isEqualTo("브레이크 패드");
+    }
+
+    @Test
+    void findRecentBySku_전체창고는_sku의_최근이력을_시각내림차순으로_반환한다() {
+        // HMC-EN-00214: 06-04(ADJUST -5), 06-03(IN 30), 05-15(OUT -40, IN 40: 동일시각 id 내림차순)
+        List<MovementHistory> history = adapter.findRecentBySku("HMC-EN-00214", List.of(), 5);
+
+        assertThat(history).extracting(MovementHistory::delta).containsExactly(-5, 30, -40, 40);
+    }
+
+    @Test
+    void findRecentBySku_limit으로_건수를_제한한다() {
+        List<MovementHistory> history = adapter.findRecentBySku("HMC-EN-00214", List.of(), 2);
+
+        assertThat(history).extracting(MovementHistory::delta).containsExactly(-5, 30);
+    }
+
+    @Test
+    void findRecentBySku_창고코드_필터는_해당_창고_이력만_반환한다() {
+        // HMC-EN-00214는 WH-SE-001(IN·IN·ADJUST)과 HQ-001(OUT)에 있다 → HQ-001 필터 시 OUTBOUND만.
+        List<MovementHistory> history = adapter.findRecentBySku("HMC-EN-00214", List.of("HQ-001"), 5);
+
+        assertThat(history).extracting(MovementHistory::type).containsExactly(MovementType.OUTBOUND);
     }
 
     private static MovementSearchQuery query(String keyword, List<String> warehouseCodes, MovementType type,

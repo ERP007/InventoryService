@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 
@@ -58,6 +59,11 @@ class StockMovementServiceTest {
         public MovementSummaryPage search(MovementSearchQuery query) {
             this.searchArg = query;
             return new MovementSummaryPage(List.of(), query.page(), query.size(), 0, 0);
+        }
+
+        @Override
+        public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
+            return List.of();
         }
     }
 }
