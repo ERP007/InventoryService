@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Locale;
 
 import org.springframework.data.domain.Page;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
+import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
@@ -45,6 +47,11 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
                 pageable);
         return new MovementSummaryPage(
                 page.getContent(), query.page(), query.size(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    @Override
+    public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
+        return jpaDao.findRecentBySku(sku, !warehouseCodes.isEmpty(), warehouseCodes, PageRequest.of(0, limit));
     }
 
     /**

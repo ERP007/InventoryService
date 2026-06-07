@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.MovementType;
+import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 
 public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, Long> {
@@ -57,5 +58,24 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             @Param("type") MovementType type,
             @Param("fromInstant") Instant fromInstant,
             @Param("toExclusive") Instant toExclusive,
+            Pageable pageable);
+
+    /**
+     * sku의 최근 이동 이력을 시각 내림차순으로 조회한다(상세 패널, 건수 제한은 Pageable로 위임).
+     * 조인: WarehouseEntity는 warehouseCodes 필터(테넌시)용이다. 동일 시각은 id 내림차순으로 최신을 우선한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementHistory(
+                m.type, m.delta, m.executorEmpNo, m.performedAt)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE m.sku = :sku
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            ORDER BY m.performedAt DESC, m.id DESC
+            """)
+    List<MovementHistory> findRecentBySku(
+            @Param("sku") String sku,
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes,
             Pageable pageable);
 }

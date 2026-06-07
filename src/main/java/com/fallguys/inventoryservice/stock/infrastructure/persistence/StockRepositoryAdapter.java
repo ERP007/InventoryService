@@ -1,5 +1,6 @@
 package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -16,6 +17,7 @@ import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
@@ -60,6 +62,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
         return jpaDao.findDetailByWarehouseCodeAndSku(warehouseCode, sku);
+    }
+
+    @Override
+    public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
+        return jpaDao.findSkuWarehouseStocks(sku, !warehouseCodes.isEmpty(), warehouseCodes);
     }
 
     /**

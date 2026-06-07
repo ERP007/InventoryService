@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 
 public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
@@ -87,4 +88,22 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             """)
     Optional<StockDetail> findDetailByWarehouseCodeAndSku(
             @Param("warehouseCode") String warehouseCode, @Param("sku") String sku);
+
+    /**
+     * sku의 창고별 재고 행을 부품명·창고(code·name) 조인으로 조회한다(상세 패널).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인. warehouseCodes 필터는 hasWarehouseFilter로 on/off한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSkuRow(
+                s.itemName, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            ORDER BY w.code
+            """)
+    List<StockSkuRow> findSkuWarehouseStocks(
+            @Param("sku") String sku,
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes);
 }
