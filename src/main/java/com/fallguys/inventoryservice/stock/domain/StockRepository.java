@@ -1,10 +1,12 @@
 package com.fallguys.inventoryservice.stock.domain;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
 /**
@@ -26,4 +28,7 @@ public interface StockRepository {
 
     /** 저장 직후 식별자로 생성 결과(창고 코드 조인 포함)를 조회한다. 없으면 empty. */
     Optional<StockCreateResult> findResultById(Long id);
+
+    /** sku의 창고별 재고 행을 조회한다(상세 패널). warehouseCodes가 비어있으면 전체 창고, 있으면 해당 창고로 한정. */
+    List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes);
 }
