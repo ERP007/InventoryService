@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.stock.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -64,6 +65,11 @@ class StockMovementServiceTest {
         @Override
         public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
             return List.of();
+        }
+
+        @Override
+        public long countRecent(List<String> warehouseCodes, Instant since) {
+            return 0;
         }
     }
 }

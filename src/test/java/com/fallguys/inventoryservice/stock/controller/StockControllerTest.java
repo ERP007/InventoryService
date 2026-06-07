@@ -29,6 +29,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.StockService;
+import com.fallguys.inventoryservice.stock.domain.StockKpiService;
 import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
@@ -37,6 +38,7 @@ import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
@@ -285,6 +287,24 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.details[0].field").value("sku"));
     }
 
+    // ---- GET /kpi : 전체 Role, Tenancy 차등 ----
+
+    @Test
+    void KPI조회는_200과_4개_메트릭을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/kpi").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalSkuCount").value(20))
+                .andExpect(jsonPath("$.lowStockCount").value(3))
+                .andExpect(jsonPath("$.noStockCount").value(1))
+                .andExpect(jsonPath("$.recentAdjustCount").value(8));
+    }
+
+    @Test
+    void KPI조회는_가장_낮은_BRANCH_STAFF도_200으로_조회된다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/kpi").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk());
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -297,6 +317,12 @@ class StockControllerTest {
         StockSkuDetailService stockSkuDetailService(StockRepository stockRepository,
                                                     StockMovementRepository stockMovementRepository) {
             return new StockSkuDetailService(stockRepository, stockMovementRepository);
+        }
+
+        @Bean
+        StockKpiService stockKpiService(StockRepository stockRepository,
+                                        StockMovementRepository stockMovementRepository) {
+            return new StockKpiService(stockRepository, stockMovementRepository);
         }
 
         @Bean
@@ -347,6 +373,11 @@ class StockControllerTest {
                     }
                     return List.of();
                 }
+
+                @Override
+                public StockStatusCount countByStatus(List<String> warehouseCodes) {
+                    return new StockStatusCount(20, 3, 1);
+                }
             };
         }
 
@@ -362,6 +393,11 @@ class StockControllerTest {
                 public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
                     return List.of(new MovementHistory(
                             MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
+                }
+
+                @Override
+                public long countRecent(List<String> warehouseCodes, Instant since) {
+                    return 8;
                 }
             };
         }

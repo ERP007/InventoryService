@@ -137,6 +137,11 @@ class StockMovementControllerTest {
                 public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
                     return List.of();
                 }
+
+                @Override
+                public long countRecent(List<String> warehouseCodes, Instant since) {
+                    return 0;
+                }
             };
             return new StockMovementService(repository);
         }

@@ -178,6 +178,24 @@ class StockMovementRepositoryAdapterTest {
         assertThat(history).extracting(MovementHistory::type).containsExactly(MovementType.OUTBOUND);
     }
 
+    @Test
+    void countRecent_기준시각_이후_이동을_센다() {
+        Instant since = LocalDate.of(2026, 6, 3).atStartOfDay(ZONE).toInstant();
+
+        long count = adapter.countRecent(List.of(), since);
+
+        assertThat(count).isEqualTo(2); // 06-03, 06-04
+    }
+
+    @Test
+    void countRecent_창고코드_필터는_해당_창고_이동만_센다() {
+        Instant since = LocalDate.of(2026, 5, 1).atStartOfDay(ZONE).toInstant();
+
+        long count = adapter.countRecent(List.of("HQ-001"), since);
+
+        assertThat(count).isEqualTo(1); // HQ-001 OUTBOUND 1건
+    }
+
     private static MovementSearchQuery query(String keyword, List<String> warehouseCodes, MovementType type,
             LocalDate from, LocalDate to, MovementSortField field, SortDirection direction, int page, int size) {
         return new MovementSearchQuery(keyword, warehouseCodes, type, from, to, field, direction, page, size);

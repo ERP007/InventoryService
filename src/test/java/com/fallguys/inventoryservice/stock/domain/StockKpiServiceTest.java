@@ -1,8 +1,8 @@
 package com.fallguys.inventoryservice.stock.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -10,74 +10,60 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
-import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockKpi;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
-import com.fallguys.inventoryservice.stock.domain.query.StockSkuDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
-class StockSkuDetailServiceTest {
+class StockKpiServiceTest {
 
     @Test
-    void ADMIN은_전사범위로_조회하고_합계와_이력을_조립한다() {
+    void ADMIN은_전사범위로_집계하고_최근7일_기준으로_조정수를_센다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(
-                new StockSkuRow("엔진오일 필터", 2L, "WH-SE-001", "서울 1창고", 48, 50),
-                new StockSkuRow("엔진오일 필터", 1L, "HQ-001", "본사", 100, 100));
+        stockRepo.counts = new StockStatusCount(20, 3, 1);
         StubMovementRepository movementRepo = new StubMovementRepository();
-        movementRepo.history = List.of(
-                new MovementHistory(MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo);
+        movementRepo.recentCount = 8;
+        StockKpiService service = new StockKpiService(stockRepo, movementRepo);
+        Instant now = Instant.parse("2026-06-07T08:00:00Z");
 
-        StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
+        StockKpi kpi = service.getKpi(TenancyType.ADMIN, null, now);
 
-        assertThat(stockRepo.scope).isEmpty();      // 전사
+        assertThat(stockRepo.scope).isEmpty();
         assertThat(movementRepo.scope).isEmpty();
-        assertThat(movementRepo.limit).isEqualTo(5);
-        assertThat(detail.itemName()).isEqualTo("엔진오일 필터");
-        assertThat(detail.totalQuantity()).isEqualTo(148);
-        assertThat(detail.totalSafetyStock()).isEqualTo(150);
-        assertThat(detail.warehouses()).hasSize(2);
-        assertThat(detail.history()).hasSize(1);
+        assertThat(movementRepo.since).isEqualTo(now.minus(Duration.ofDays(7)));
+        assertThat(kpi.totalSkuCount()).isEqualTo(20);
+        assertThat(kpi.lowStockCount()).isEqualTo(3);
+        assertThat(kpi.noStockCount()).isEqualTo(1);
+        assertThat(kpi.recentAdjustCount()).isEqualTo(8);
     }
 
     @Test
     void BRANCH는_자기창고로_범위를_강제한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", 2L, "WH-SE-001", "서울 1창고", 48, 50));
+        stockRepo.counts = new StockStatusCount(5, 2, 0);
         StubMovementRepository movementRepo = new StubMovementRepository();
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo);
+        StockKpiService service = new StockKpiService(stockRepo, movementRepo);
 
-        service.getSkuDetail("HMC-EN-00214", TenancyType.BRANCH, "WH-SE-001");
+        service.getKpi(TenancyType.BRANCH, "WH-SE-001", Instant.parse("2026-06-07T08:00:00Z"));
 
         assertThat(stockRepo.scope).containsExactly("WH-SE-001");
         assertThat(movementRepo.scope).containsExactly("WH-SE-001");
     }
 
-    @Test
-    void 범위내_재고가_없으면_StockNotFoundException() {
-        StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of();
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, new StubMovementRepository());
-
-        assertThatThrownBy(() -> service.getSkuDetail("NO-SUCH", TenancyType.ADMIN, null))
-                .isInstanceOf(StockNotFoundException.class);
-    }
-
     private static final class StubStockRepository implements StockRepository {
-        private List<StockSkuRow> rows = List.of();
+        private StockStatusCount counts = new StockStatusCount(0, 0, 0);
         private List<String> scope;
 
         @Override
-        public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
+        public StockStatusCount countByStatus(List<String> warehouseCodes) {
             this.scope = warehouseCodes;
-            return rows;
+            return counts;
         }
 
         @Override
@@ -106,21 +92,21 @@ class StockSkuDetailServiceTest {
         }
 
         @Override
-        public StockStatusCount countByStatus(List<String> warehouseCodes) {
-            return new StockStatusCount(0, 0, 0);
+        public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
+            return List.of();
         }
     }
 
     private static final class StubMovementRepository implements StockMovementRepository {
-        private List<MovementHistory> history = List.of();
+        private long recentCount;
         private List<String> scope;
-        private int limit;
+        private Instant since;
 
         @Override
-        public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
+        public long countRecent(List<String> warehouseCodes, Instant since) {
             this.scope = warehouseCodes;
-            this.limit = limit;
-            return history;
+            this.since = since;
+            return recentCount;
         }
 
         @Override
@@ -129,8 +115,8 @@ class StockSkuDetailServiceTest {
         }
 
         @Override
-        public long countRecent(List<String> warehouseCodes, Instant since) {
-            return 0;
+        public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
+            return List.of();
         }
     }
 }

@@ -21,6 +21,7 @@ import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
@@ -194,6 +195,37 @@ class StockRepositoryAdapterTest {
 
         assertThat(rows).extracting(StockSkuRow::warehouseCode).containsExactly("WH-SE-001");
         assertThat(rows.get(0).quantity()).isEqualTo(120);
+    }
+
+    @Test
+    void countByStatus_전체창고는_총_부족_무재고_포지션수를_센다() {
+        seedStocks();
+
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isEqualTo(4);
+        assertThat(counts.low()).isEqualTo(1);   // HMC-BR-00788 (30/40)
+        assertThat(counts.out()).isEqualTo(1);   // HMC-OIL-5W30 (0/60)
+    }
+
+    @Test
+    void countByStatus_창고필터는_해당_창고만_센다() {
+        seedStocks();
+
+        StockStatusCount counts = adapter.countByStatus(List.of("WH-SE-001"));
+
+        assertThat(counts.total()).isEqualTo(3);
+        assertThat(counts.low()).isEqualTo(1);
+        assertThat(counts.out()).isEqualTo(1);
+    }
+
+    @Test
+    void countByStatus_재고가_없으면_모두_0이다() {
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isZero();
+        assertThat(counts.low()).isZero();
+        assertThat(counts.out()).isZero();
     }
 
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,
