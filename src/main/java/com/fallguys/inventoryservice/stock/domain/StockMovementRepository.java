@@ -1,5 +1,6 @@
 package com.fallguys.inventoryservice.stock.domain;
 
+import java.time.Instant;
 import java.util.List;
 
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
@@ -16,4 +17,7 @@ public interface StockMovementRepository {
 
     /** sku의 최근 이동 이력을 limit건 조회한다(상세 패널). warehouseCodes가 비어있으면 전체, 있으면 해당 창고로 한정. */
     List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit);
+
+    /** since 이후 이동 건수를 센다(KPI 최근 7일). warehouseCodes가 비어있으면 전사. */
+    long countRecent(List<String> warehouseCodes, Instant since);
 }
