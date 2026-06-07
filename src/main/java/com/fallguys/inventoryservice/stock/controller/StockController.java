@@ -21,15 +21,19 @@ import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
+import com.fallguys.inventoryservice.stock.controller.dto.StockAdjustmentRequest;
+import com.fallguys.inventoryservice.stock.controller.dto.StockAdjustmentResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockDetailResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockKpiResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockListResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockSkuDetailResponse;
+import com.fallguys.inventoryservice.stock.domain.StockAdjustmentService;
 import com.fallguys.inventoryservice.stock.domain.StockKpiService;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
+import com.fallguys.inventoryservice.stock.domain.query.StockAdjustmentResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockKpi;
@@ -52,6 +56,7 @@ public class StockController {
     private final StockService stockService;
     private final StockSkuDetailService stockSkuDetailService;
     private final StockKpiService stockKpiService;
+    private final StockAdjustmentService stockAdjustmentService;
 
     /**
      * 재고 목록을 조회한다. 전 Role 호출 가능하나 Tenancy로 범위가 차등된다 — BRANCH는 자기 창고(tenancy_code) 재고만 본다.
@@ -193,5 +198,24 @@ public class StockController {
         String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
         StockKpi kpi = stockKpiService.getKpi(tenancyType, tenancyCode, Instant.now());
         return ResponseEntity.ok(StockKpiResponse.from(kpi));
+    }
+
+    /**
+     * 재고를 조정하고 이동 이력 1건을 남긴다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * 형식 오류(reason 누락·증감 ≤0·실사 &lt;0)는 400(INVALID_PARAMETER), 재고 없음은 404(STOCK_NOT_FOUND),
+     * 변동 없음은 400(NO_STOCK_CHANGE), 차감 초과는 409(INSUFFICIENT_STOCK)로 매핑된다.
+     */
+    @Operation(
+            summary = "재고 조정(ADMIN·HQ_MANAGER)",
+            description = "증가/감소/실사보정으로 재고를 보정하고 append-only 이동 이력을 1건 생성한다. 음수 재고는 거부한다."
+    )
+    @PostMapping("/adjustments")
+    public ResponseEntity<StockAdjustmentResponse> adjust(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody StockAdjustmentRequest request) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        String executorEmpNo = JwtClaimExtractor.extractEmployeeNo(jwt);
+        StockAdjustmentResult result = stockAdjustmentService.adjust(request.toCommand(executorEmpNo));
+        return ResponseEntity.ok(StockAdjustmentResponse.from(result));
     }
 }
