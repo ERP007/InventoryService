@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Repository;
 
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
@@ -57,6 +58,11 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
     @Override
     public long countRecent(List<String> warehouseCodes, Instant since) {
         return jpaDao.countRecent(!warehouseCodes.isEmpty(), warehouseCodes, since);
+    }
+
+    @Override
+    public StockMovement save(StockMovement movement) {
+        return jpaDao.save(StockMovementEntity.from(movement)).toDomain();
     }
 
     /**

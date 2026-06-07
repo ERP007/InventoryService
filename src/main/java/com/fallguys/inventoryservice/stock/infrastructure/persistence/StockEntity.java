@@ -93,4 +93,10 @@ public class StockEntity {
     public Stock toDomain() {
         return Stock.of(id, sku, itemName, warehouseId, currentStock, safetyStock);
     }
+
+    /** 조정 등으로 변동한 재고 수준(현재고·안전재고)을 도메인 상태로 동기화한다. id·sku·창고·감사 컬럼·version은 건드리지 않는다. */
+    public void update(Stock stock) {
+        this.currentStock = stock.getQuantity();
+        this.safetyStock = stock.getSafetyStock();
+    }
 }

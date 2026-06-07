@@ -52,7 +52,14 @@ public class StockRepositoryAdapter implements StockRepository {
 
     @Override
     public Long save(Stock stock) {
-        return jpaDao.save(StockEntity.from(stock)).getId();
+        if (stock.getId() == null) {
+            return jpaDao.save(StockEntity.from(stock)).getId();
+        }
+        // 기존 행: 같은 트랜잭션의 영속 엔티티를 조회(1차 캐시 적중)해 변동을 반영한다 → flush 시 @Version 검증.
+        StockEntity entity = jpaDao.findById(stock.getId())
+                .orElseThrow(() -> new IllegalStateException("수정할 재고를 찾지 못했습니다: " + stock.getId()));
+        entity.update(stock);
+        return jpaDao.save(entity).getId();
     }
 
     @Override
@@ -73,6 +80,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public StockStatusCount countByStatus(List<String> warehouseCodes) {
         return jpaDao.countByStatus(!warehouseCodes.isEmpty(), warehouseCodes);
+    }
+
+    @Override
+    public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+        return jpaDao.findBySkuAndWarehouseCode(sku, warehouseCode).map(StockEntity::toDomain);
     }
 
     /**

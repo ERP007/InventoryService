@@ -124,4 +124,17 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
     StockStatusCount countByStatus(
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes);
+
+    /**
+     * 조정 대상 재고 엔티티를 (sku × 창고코드)로 조회한다(수정용).
+     * 엔티티가 영속 컨텍스트에 관리되어, 이어지는 update·flush에서 @Version 낙관락이 적용된다.
+     */
+    @Query("""
+            SELECT s
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku AND w.code = :warehouseCode
+            """)
+    Optional<StockEntity> findBySkuAndWarehouseCode(
+            @Param("sku") String sku, @Param("warehouseCode") String warehouseCode);
 }
