@@ -95,6 +95,11 @@ class StockKpiServiceTest {
         public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
             return List.of();
         }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            return Optional.empty();
+        }
     }
 
     private static final class StubMovementRepository implements StockMovementRepository {
@@ -117,6 +122,11 @@ class StockKpiServiceTest {
         @Override
         public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
             return List.of();
+        }
+
+        @Override
+        public StockMovement save(StockMovement movement) {
+            return movement;
         }
     }
 }

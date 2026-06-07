@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.AdjustmentType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
@@ -226,6 +227,41 @@ class StockRepositoryAdapterTest {
         assertThat(counts.total()).isZero();
         assertThat(counts.low()).isZero();
         assertThat(counts.out()).isZero();
+    }
+
+    @Test
+    void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
+        seedStocks();
+
+        Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+
+        assertThat(stock.getId()).isNotNull();
+        assertThat(stock.getWarehouseId()).isEqualTo(2L);
+        assertThat(stock.getQuantity()).isEqualTo(120);
+        assertThat(stock.getSafetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findBySkuAndWarehouseCode는_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "NO-WH")).isEmpty();
+        assertThat(adapter.findBySkuAndWarehouseCode("NO-SKU", "WH-SE-001")).isEmpty();
+    }
+
+    @Test
+    void save_기존재고는_현재고를_갱신한다() {
+        seedStocks();
+        Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+        int delta = stock.adjust(AdjustmentType.DECREASE, 20); // 120 → 100
+
+        adapter.save(stock);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        Stock reloaded = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+        assertThat(delta).isEqualTo(-20);
+        assertThat(reloaded.getQuantity()).isEqualTo(100);
     }
 
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,

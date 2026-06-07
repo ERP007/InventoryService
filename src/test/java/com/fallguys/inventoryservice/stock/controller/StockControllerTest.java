@@ -29,7 +29,9 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.StockService;
+import com.fallguys.inventoryservice.stock.domain.StockAdjustmentService;
 import com.fallguys.inventoryservice.stock.domain.StockKpiService;
+import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
@@ -305,6 +307,100 @@ class StockControllerTest {
                 .andExpect(status().isOk());
     }
 
+    // ---- POST /adjustments : ADMIN·HQ_MANAGER 전용 ----
+
+    @Test
+    void 조정은_200과_변동전후_상태_이동식별자를_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE","memo":"파손"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movementId").value(88231))
+                .andExpect(jsonPath("$.stockId").value(1001))
+                .andExpect(jsonPath("$.sku").value("HMC-EN-00214"))
+                .andExpect(jsonPath("$.warehouseCode").value("WH-SE-002"))
+                .andExpect(jsonPath("$.previousQuantity").value(51))
+                .andExpect(jsonPath("$.delta").value(-3))
+                .andExpect(jsonPath("$.currentQuantity").value(48))
+                .andExpect(jsonPath("$.safetyStock").value(50))
+                .andExpect(jsonPath("$.status").value("LOW"))
+                .andExpect(jsonPath("$.occurredAt").exists());
+    }
+
+    @Test
+    void 조정은_HQ_MANAGER도_허용된다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.HQ_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"INCREASE","quantity":5,"reason":"FOUND"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 조정은_권한없는_BRANCH_MANAGER면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 조정_reason_누락은_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void 조정_증가수량_0은_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"INCREASE","quantity":0,"reason":"FOUND"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void 조정_재고없으면_404와_STOCK_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"NO-SUCH-SKU","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
+    }
+
+    @Test
+    void 조정_차감이_가용재고_초과면_409와_INSUFFICIENT_STOCK을_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":100,"reason":"DAMAGE"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INSUFFICIENT_STOCK"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -323,6 +419,12 @@ class StockControllerTest {
         StockKpiService stockKpiService(StockRepository stockRepository,
                                         StockMovementRepository stockMovementRepository) {
             return new StockKpiService(stockRepository, stockMovementRepository);
+        }
+
+        @Bean
+        StockAdjustmentService stockAdjustmentService(StockRepository stockRepository,
+                                                      StockMovementRepository stockMovementRepository) {
+            return new StockAdjustmentService(stockRepository, stockMovementRepository);
         }
 
         @Bean
@@ -378,6 +480,14 @@ class StockControllerTest {
                 public StockStatusCount countByStatus(List<String> warehouseCodes) {
                     return new StockStatusCount(20, 3, 1);
                 }
+
+                @Override
+                public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+                    if ("HMC-EN-00214".equals(sku) && "WH-SE-002".equals(warehouseCode)) {
+                        return Optional.of(Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", 2L, 51, 50));
+                    }
+                    return Optional.empty();
+                }
             };
         }
 
@@ -398,6 +508,15 @@ class StockControllerTest {
                 @Override
                 public long countRecent(List<String> warehouseCodes, Instant since) {
                     return 8;
+                }
+
+                @Override
+                public StockMovement save(StockMovement movement) {
+                    return StockMovement.of(88231L, movement.getSku(), movement.getWarehouseId(),
+                            movement.getDelta(), movement.getType(), movement.getReason(),
+                            movement.getSourceRef(), movement.getSourceLineNo(), movement.getStockAfter(),
+                            movement.getMemo(), movement.getExecutorEmpNo(),
+                            Instant.parse("2026-05-28T14:35:00Z"));
                 }
             };
         }

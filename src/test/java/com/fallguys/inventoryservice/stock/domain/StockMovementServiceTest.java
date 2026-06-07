@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
@@ -70,6 +71,11 @@ class StockMovementServiceTest {
         @Override
         public long countRecent(List<String> warehouseCodes, Instant since) {
             return 0;
+        }
+
+        @Override
+        public StockMovement save(StockMovement movement) {
+            return movement;
         }
     }
 }

@@ -109,6 +109,11 @@ class StockSkuDetailServiceTest {
         public StockStatusCount countByStatus(List<String> warehouseCodes) {
             return new StockStatusCount(0, 0, 0);
         }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            return Optional.empty();
+        }
     }
 
     private static final class StubMovementRepository implements StockMovementRepository {
@@ -131,6 +136,11 @@ class StockSkuDetailServiceTest {
         @Override
         public long countRecent(List<String> warehouseCodes, Instant since) {
             return 0;
+        }
+
+        @Override
+        public StockMovement save(StockMovement movement) {
+            return movement;
         }
     }
 }

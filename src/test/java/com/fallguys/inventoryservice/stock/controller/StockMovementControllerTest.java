@@ -22,6 +22,7 @@ import com.fallguys.inventoryservice.shared.security.SecurityConfig;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
+import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
 import com.fallguys.inventoryservice.stock.domain.StockMovementService;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
@@ -141,6 +142,11 @@ class StockMovementControllerTest {
                 @Override
                 public long countRecent(List<String> warehouseCodes, Instant since) {
                     return 0;
+                }
+
+                @Override
+                public StockMovement save(StockMovement movement) {
+                    return movement;
                 }
             };
             return new StockMovementService(repository);

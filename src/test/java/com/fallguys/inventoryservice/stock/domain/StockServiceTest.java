@@ -178,6 +178,11 @@ class StockServiceTest {
         public StockStatusCount countByStatus(List<String> warehouseCodes) {
             return new StockStatusCount(0, 0, 0);
         }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            return Optional.empty();
+        }
     }
 
     private static final class StubWarehouseRepository implements WarehouseRepository {

@@ -14,8 +14,11 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
+import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
+import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
@@ -25,7 +28,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest
-@Import(StockMovementRepositoryAdapter.class)
+@Import({StockMovementRepositoryAdapter.class, JpaAuditingConfig.class})
 class StockMovementRepositoryAdapterTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
@@ -194,6 +197,20 @@ class StockMovementRepositoryAdapterTest {
         long count = adapter.countRecent(List.of("HQ-001"), since);
 
         assertThat(count).isEqualTo(1); // HQ-001 OUTBOUND 1건
+    }
+
+    @Test
+    void save는_이동이력을_저장하고_식별자와_발생시각을_채운다() {
+        StockMovement movement = StockMovement.createAdjustment(
+                "HMC-EN-00214", 2L, -3, MovementType.DECREASE, MovementReason.DAMAGE, 48, "파손", "HMC0001");
+
+        StockMovement saved = adapter.save(movement);
+
+        assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getPerformedAt()).isNotNull();
+        assertThat(saved.getDelta()).isEqualTo(-3);
+        assertThat(saved.getType()).isEqualTo(MovementType.DECREASE);
+        assertThat(saved.getReason()).isEqualTo(MovementReason.DAMAGE);
     }
 
     private static MovementSearchQuery query(String keyword, List<String> warehouseCodes, MovementType type,
