@@ -19,6 +19,7 @@ import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
@@ -67,6 +68,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
         return jpaDao.findSkuWarehouseStocks(sku, !warehouseCodes.isEmpty(), warehouseCodes);
+    }
+
+    @Override
+    public StockStatusCount countByStatus(List<String> warehouseCodes) {
+        return jpaDao.countByStatus(!warehouseCodes.isEmpty(), warehouseCodes);
     }
 
     /**

@@ -54,6 +54,11 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
         return jpaDao.findRecentBySku(sku, !warehouseCodes.isEmpty(), warehouseCodes, PageRequest.of(0, limit));
     }
 
+    @Override
+    public long countRecent(List<String> warehouseCodes, Instant since) {
+        return jpaDao.countRecent(!warehouseCodes.isEmpty(), warehouseCodes, since);
+    }
+
     /**
      * 도메인 정렬 조건을 ORDER BY 식으로 변환한다(기술 의존은 이 계층에 한정).
      * 안정 정렬을 위해 id 오름차순을 tie-breaker로 덧붙인다.

@@ -78,4 +78,19 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes,
             Pageable pageable);
+
+    /**
+     * since 이후 이동 건수를 센다(KPI 최근 7일). 조인: WarehouseEntity는 warehouseCodes 필터(테넌시)용이다.
+     */
+    @Query("""
+            SELECT COUNT(m)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+              AND m.performedAt >= :since
+            """)
+    long countRecent(
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes,
+            @Param("since") Instant since);
 }
