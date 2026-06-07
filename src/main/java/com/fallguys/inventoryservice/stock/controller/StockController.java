@@ -24,10 +24,13 @@ import com.fallguys.inventoryservice.stock.controller.dto.StockCreateRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockDetailResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockListResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.StockSkuDetailResponse;
 import com.fallguys.inventoryservice.stock.domain.StockService;
+import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 public class StockController {
 
     private final StockService stockService;
+    private final StockSkuDetailService stockSkuDetailService;
 
     /**
      * 재고 목록을 조회한다. 전 Role 호출 가능하나 Tenancy로 범위가 차등된다 — BRANCH는 자기 창고(tenancy_code) 재고만 본다.
@@ -101,6 +105,38 @@ public class StockController {
         String tenancyCode = JwtClaimExtractor.extractTenancyCode(jwt);
         StockDetail detail = stockService.getDetail(warehouseCode, sku, tenancyCode);
         return ResponseEntity.ok(StockDetailResponse.from(detail));
+    }
+
+    /**
+     * sku 상세 패널을 조회한다. 전 Role 호출 가능하나 Tenancy로 범위가 차등된다 — BRANCH는 자기 창고분만 집계된다.
+     * 창고별 현재고·안전재고·상태와 전체 합계, 최근 이동 이력 5건을 반환한다.
+     * sku 형식 오류(빈 값·'-' 미포함)는 400(INVALID_PARAMETER), 범위 내 재고 없음(소속 외 포함)은 404(STOCK_NOT_FOUND, 존재 은닉).
+     */
+    @Operation(
+            summary = "재고 상세 패널 조회(sku)",
+            description = "행 클릭 시 우측 상세 패널 바인딩용. 창고별 재고·상태, 전체 합계, 최근 이동 5건을 반환한다. "
+                    + "BRANCH 사용자는 자기 지점 창고분만 집계된다."
+    )
+    @GetMapping("/{sku}")
+    public ResponseEntity<StockSkuDetailResponse> detailBySku(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "부품 코드 (예: HMC-EN-00214)")
+            @PathVariable String sku
+    ) {
+        requireValidSku(sku);
+        TenancyType tenancyType = JwtClaimExtractor.extractTenancyType(jwt);
+        // BRANCH만 자기 창고로 한정하므로 그때만 tenancy_code를 요구한다(ADMIN/HQ는 전사라 불필요).
+        String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
+        StockSkuDetail detail = stockSkuDetailService.getSkuDetail(sku, tenancyType, tenancyCode);
+        return ResponseEntity.ok(StockSkuDetailResponse.from(detail));
+    }
+
+    /** sku path 변수 형식 검증(빈 값·'-' 미포함 금지). 위반 시 400(INVALID_PARAMETER). */
+    private static void requireValidSku(String sku) {
+        if (sku == null || sku.isBlank() || !sku.contains("-")) {
+            throw new InvalidParameterException(
+                    List.of(new ParameterViolation("sku", sku, List.of("'-' 포함 코드"))));
+        }
     }
 
     /** path 변수 형식 검증(빈 문자열 금지). 위반 시 400(INVALID_PARAMETER). */
