@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
 import java.time.Instant;
 
+import org.hibernate.annotations.Check;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -30,6 +31,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "stock",
         uniqueConstraints = @UniqueConstraint(name = "uk_stock_sku_warehouse", columnNames = {"sku", "warehouse_id"}))
+@Check(name = "chk_stock_nonneg", constraints = "current_stock >= 0 AND safety_stock >= 0")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
