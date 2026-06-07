@@ -20,4 +20,7 @@ public interface StockMovementRepository {
 
     /** since 이후 이동 건수를 센다(KPI 최근 7일). warehouseCodes가 비어있으면 전사. */
     long countRecent(List<String> warehouseCodes, Instant since);
+
+    /** 신규 이동 이력을 저장하고 식별자·발생시각이 채워진 결과를 반환한다(append-only). */
+    StockMovement save(StockMovement movement);
 }

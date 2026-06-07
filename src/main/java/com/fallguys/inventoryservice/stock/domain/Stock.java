@@ -1,5 +1,8 @@
 package com.fallguys.inventoryservice.stock.domain;
 
+import com.fallguys.inventoryservice.stock.domain.exception.InsufficientStockException;
+import com.fallguys.inventoryservice.stock.domain.exception.NoStockChangeException;
+
 import lombok.Getter;
 
 /**
@@ -14,7 +17,7 @@ public class Stock {
     private final String sku;
     private final String itemName;
     private final Long warehouseId;
-    private final int quantity;
+    private int quantity;
     private final int safetyStock;
 
     private Stock(Long id, String sku, String itemName, Long warehouseId, int quantity, int safetyStock) {
@@ -54,5 +57,25 @@ public class Stock {
     /** 현재고·안전재고로부터 재고 상태를 파생한다. */
     public StockStatus status() {
         return StockStatus.of(quantity, safetyStock);
+    }
+
+    /**
+     * 재고를 조정해 변동량(delta)을 현재고에 반영하고 그 delta를 반환한다.
+     * INCREASE +input, DECREASE -input, ADJUST input(실측)-현재고.
+     *
+     * @throws NoStockChangeException 계산된 변동량이 0일 때(변화 없음)
+     * @throws InsufficientStockException 반영 결과 현재고가 음수가 될 때(음수 재고 금지)
+     */
+    public int adjust(AdjustmentType type, int inputQuantity) {
+        int delta = type.delta(this.quantity, inputQuantity);
+        if (delta == 0) {
+            throw new NoStockChangeException(sku);
+        }
+        int next = this.quantity + delta;
+        if (next < 0) {
+            throw new InsufficientStockException(sku, this.quantity, delta);
+        }
+        this.quantity = next;
+        return delta;
     }
 }

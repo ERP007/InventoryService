@@ -35,4 +35,7 @@ public interface StockRepository {
 
     /** 범위 내 (sku × warehouse) 포지션의 총/부족/무재고 수를 센다(KPI). warehouseCodes가 비어있으면 전사. */
     StockStatusCount countByStatus(List<String> warehouseCodes);
+
+    /** 조정 대상 재고를 (sku × warehouseCode)로 조회한다(수정용 — 같은 트랜잭션에서 save 시 @Version 적용). 없으면 empty. */
+    Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode);
 }
