@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -49,11 +48,11 @@ class WarehouseControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    /** 지정한 Role을 erp-client 클라이언트 롤로 담은 JWT 인증을 요청에 주입한다. */
+    /** 지정한 Role을 user_role 클레임으로 담은 JWT 인증을 요청에 주입한다. */
     private static RequestPostProcessor roleJwt(UserRole role) {
         return jwt().jwt(token -> token
-                .claim("preferred_username", "tester")
-                .claim("resource_access", Map.of("erp-client", Map.of("roles", List.of(role.name())))));
+                .claim("employee_no", "tester")
+                .claim("user_role", role.name()));
     }
 
     // ---- GET (조회) : 전체 Role 허용 ----
