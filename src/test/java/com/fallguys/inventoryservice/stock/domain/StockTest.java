@@ -120,4 +120,13 @@ class StockTest {
         assertThat(stock.getQuantity()).isZero();
         assertThat(stock.status()).isEqualTo(StockStatus.OUT);
     }
+
+    @Test
+    void 음수_입력수량은_IllegalArgumentException이고_현재고는_불변이다() {
+        Stock stock = Stock.of(1001L, "SKU-1", "부품", 1L, 50, 40);
+
+        assertThatThrownBy(() -> stock.adjust(AdjustmentType.DECREASE, -5))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(stock.getQuantity()).isEqualTo(50);
+    }
 }
