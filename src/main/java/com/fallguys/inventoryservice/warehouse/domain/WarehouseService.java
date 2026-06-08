@@ -14,6 +14,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
@@ -39,6 +40,17 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseSummary> search(WarehouseSearchQuery query) {
         return warehouseRepository.search(query);
+    }
+
+    /**
+     * 출고 창고 선택 드롭다운용으로 활성(active=true) 본사(type=HQ) 창고를 슬림 모델로 조회한다.
+     *
+     * 흐름: 영속성에서 활성·HQ 조건으로 필터링된 목록을 code 오름차순으로 가져온다.
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 권한 분기 없음(전 Role 동일 결과). 매칭 0건이면 빈 리스트.
+     */
+    @Transactional(readOnly = true)
+    public List<WarehouseHqSummary> findHqWarehouses() {
+        return warehouseRepository.findActiveHq();
     }
 
     /**
@@ -80,7 +92,7 @@ public class WarehouseService {
      * 수정 모달 프리필을 위해 창고 단건을 상세 조회한다(소속 지점명·주소·version 포함).
      *
      * 흐름:
-     * 1) 식별자로 읽기 모델(WarehouseSummaryForEdit)을 조회한다.
+     * 1) 창고 코드로 읽기 모델(WarehouseSummaryForEdit)을 조회한다.
      * 2) 없으면 존재를 은닉하여 404로 막는다("없음"과 "소속 외"를 구분하지 않는다).
      *
      * 트랜잭션: 읽기 전용. 외부 호출 없음.
@@ -89,9 +101,9 @@ public class WarehouseService {
      * - 창고 없음/소속 외: WarehouseNotFoundException (404)
      */
     @Transactional(readOnly = true)
-    public WarehouseSummaryForEdit getById(Long id) {
-        return warehouseRepository.findForEditById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit getByCode(String code) {
+        return warehouseRepository.findForEditByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
     }
 
     /**
@@ -111,19 +123,19 @@ public class WarehouseService {
      * - version 불일치(동시 수정): OptimisticLockConflictException (409)
      */
     @Transactional
-    public WarehouseSummaryForEdit update(Long id, UpdateWarehouseCommand command) {
+    public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
         Warehouse.validateBranchRule(command.type(), command.branchId());
         if (command.branchId() != null && !branchLocationRepository.existsById(command.branchId())) {
             throw new BranchNotFoundException(command.branchId());
         }
-        return warehouseRepository.update(id, command);
+        return warehouseRepository.update(code, command);
     }
 
     /**
      * 창고 활성 상태를 전환한다. 같은 값으로의 전환은 멱등(no-op)이라 변경 없이 현재 상태를 반환한다.
      *
      * 흐름:
-     * 1) 식별자로 현재 상태를 조회한다(없으면 404).
+     * 1) 창고 코드로 현재 상태를 조회한다(없으면 404).
      * 2) 요청 active가 현재와 같으면 no-op으로 현재 상태를 그대로 반환한다(version 비교 없음 — 멱등·재시도 안전).
      * 3) 다르면 영속성에 위임해 전환한다 — version 불일치는 409.
      *
@@ -134,12 +146,12 @@ public class WarehouseService {
      * - version 불일치(실제 전환 시): OptimisticLockConflictException (409)
      */
     @Transactional
-    public WarehouseSummaryForEdit changeActive(Long id, ChangeWarehouseActiveCommand command) {
-        WarehouseSummaryForEdit current = warehouseRepository.findForEditById(id)
-                .orElseThrow(() -> new WarehouseNotFoundException(id));
+    public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
+        WarehouseSummaryForEdit current = warehouseRepository.findForEditByCode(code)
+                .orElseThrow(() -> new WarehouseNotFoundException(code));
         if (current.active() == command.active()) {
             return current;
         }
-        return warehouseRepository.changeActive(id, command);
+        return warehouseRepository.changeActive(code, command);
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
 public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
@@ -68,7 +69,26 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
             w.active, w.createdAt, w.updatedAt, w.version)
         FROM WarehouseEntity w
         LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
-        WHERE w.id = :id
+        WHERE w.code = :code
         """)
-    Optional<WarehouseSummaryForEdit> findForEditById(@Param("id") Long id);
+    Optional<WarehouseSummaryForEdit> findForEditByCode(@Param("code") String code);
+
+    /** 수정·상태전환 시 변경 대상 영속 엔티티를 창고 코드로 로드한다(code는 시스템 유일). */
+    Optional<WarehouseEntity> findByCode(String code);
+
+    /**
+     * 출고 창고 선택 드롭다운용으로 활성 본사 창고를 슬림 모델(id·code·name)로 투영한다.
+     *
+     * 필터: type=HQ(본사) AND active=true. 조인 없음(소속 지점이 없는 HQ 전용이라 branch 불필요).
+     * 정렬: code 오름차순(드롭다운 표시 순서 고정).
+     */
+    @Query("""
+        SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary(
+            w.id, w.code, w.name)
+        FROM WarehouseEntity w
+        WHERE w.type = com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType.HQ
+          AND w.active = true
+        ORDER BY w.code ASC
+        """)
+    List<WarehouseHqSummary> findActiveHq();
 }

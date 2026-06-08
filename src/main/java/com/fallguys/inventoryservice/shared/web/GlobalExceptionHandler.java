@@ -7,6 +7,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -50,6 +51,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleConflict(ConflictException ex) {
         log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
+    }
+
+    /** 동시 수정으로 인한 낙관락 충돌(JPA @Version): 409. 최신 재조회 후 재시도를 유도한다. 비즈니스성 충돌이라 WARN. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        log.warn("Optimistic lock conflict [{}]", CommonErrorCode.OPTIMISTIC_LOCK_CONFLICT.getCode());
+        return build(HttpStatus.CONFLICT,
+                CommonErrorCode.OPTIMISTIC_LOCK_CONFLICT.getCode(),
+                CommonErrorCode.OPTIMISTIC_LOCK_CONFLICT.getDefaultMessage());
     }
 
     /** 리소스 없음(존재 은닉 포함): 404. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */
