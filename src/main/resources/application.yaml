@@ -14,10 +14,15 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         format_sql: true
+        # ddl-auto=create/create-drop로 스키마를 새로 만든 직후 import.sql을 1회 실행(로컬 시드). update/validate에선 미실행.
+        hbm2ddl:
+          import_files: /import.sql
+          import_files_sql_extractor: org.hibernate.tool.schema.internal.script.MultiLineSqlScriptExtractor
+          charset_name: UTF-8
     open-in-view: false
 
 springdoc:
