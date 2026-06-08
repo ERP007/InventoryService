@@ -56,6 +56,9 @@ public class StockRepositoryAdapter implements StockRepository {
             return jpaDao.save(StockEntity.from(stock)).getId();
         }
         // 기존 행: 같은 트랜잭션의 영속 엔티티를 조회(1차 캐시 적중)해 변동을 반영한다 → flush 시 @Version 검증.
+        // 도메인의 "재고 없음"(404)은 서비스가 findBySkuAndWarehouseCode 단계에서 이미 처리한다.
+        // 여기까지 와서 못 찾는 건 같은 트랜잭션 1차 캐시상 도달 불가한 내부 모순(또는 미존재 id로의 오용)이므로,
+        // 도메인 예외(StockNotFoundException, 404)가 아니라 IllegalStateException(→500)으로 둔다.
         StockEntity entity = jpaDao.findById(stock.getId())
                 .orElseThrow(() -> new IllegalStateException("수정할 재고를 찾지 못했습니다: " + stock.getId()));
         entity.update(stock);
