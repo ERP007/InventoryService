@@ -21,16 +21,20 @@ public class Stock {
     private final Long id;
     private final String sku;
     private final String itemName;
+    private final ItemUnit itemUnit;
     private final Long warehouseId;
     private int quantity;
     private final int safetyStock;
 
-    private Stock(Long id, String sku, String itemName, Long warehouseId, int quantity, int safetyStock) {
+    private Stock(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
         if (sku == null || sku.isBlank()) {
             throw new IllegalArgumentException("sku는 필수입니다.");
         }
         if (itemName == null || itemName.isBlank()) {
             throw new IllegalArgumentException("itemName은 필수입니다.");
+        }
+        if (itemUnit == null) {
+            throw new IllegalArgumentException("itemUnit은 필수입니다.");
         }
         if (warehouseId == null) {
             throw new IllegalArgumentException("warehouseId는 필수입니다.");
@@ -44,19 +48,20 @@ public class Stock {
         this.id = id;
         this.sku = sku;
         this.itemName = itemName;
+        this.itemUnit = itemUnit;
         this.warehouseId = warehouseId;
         this.quantity = quantity;
         this.safetyStock = safetyStock;
     }
 
     /** 신규 재고를 생성한다. id는 영속 시 발급된다. */
-    public static Stock create(String sku, String itemName, Long warehouseId, int quantity, int safetyStock) {
-        return new Stock(null, sku, itemName, warehouseId, quantity, safetyStock);
+    public static Stock create(String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
+        return new Stock(null, sku, itemName, itemUnit, warehouseId, quantity, safetyStock);
     }
 
     /** 영속 엔티티에서 도메인 모델을 복원한다(조회용). */
-    public static Stock of(Long id, String sku, String itemName, Long warehouseId, int quantity, int safetyStock) {
-        return new Stock(id, sku, itemName, warehouseId, quantity, safetyStock);
+    public static Stock of(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
+        return new Stock(id, sku, itemName, itemUnit, warehouseId, quantity, safetyStock);
     }
 
     /** 현재고·안전재고로부터 재고 상태를 파생한다. */

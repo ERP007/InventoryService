@@ -9,11 +9,14 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -47,6 +50,10 @@ public class StockEntity {
     @Column(name = "item_name", nullable = false)
     private String itemName;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_unit", nullable = false)
+    private ItemUnit itemUnit;
+
     @Column(name = "warehouse_id", nullable = false)
     private Long warehouseId;
 
@@ -75,9 +82,10 @@ public class StockEntity {
     @Version
     private Long version;
 
-    private StockEntity(String sku, String itemName, Long warehouseId, int currentStock, int safetyStock) {
+    private StockEntity(String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int currentStock, int safetyStock) {
         this.sku = sku;
         this.itemName = itemName;
+        this.itemUnit = itemUnit;
         this.warehouseId = warehouseId;
         this.currentStock = currentStock;
         this.safetyStock = safetyStock;
@@ -85,13 +93,13 @@ public class StockEntity {
 
     /** 신규 재고 도메인을 영속 엔티티로 변환한다(id·감사 컬럼·version은 JPA/Auditing이 채운다). */
     public static StockEntity from(Stock stock) {
-        return new StockEntity(stock.getSku(), stock.getItemName(), stock.getWarehouseId(),
+        return new StockEntity(stock.getSku(), stock.getItemName(), stock.getItemUnit(), stock.getWarehouseId(),
                 stock.getQuantity(), stock.getSafetyStock());
     }
 
     /** 영속 엔티티를 도메인 모델로 변환한다(조회). */
     public Stock toDomain() {
-        return Stock.of(id, sku, itemName, warehouseId, currentStock, safetyStock);
+        return Stock.of(id, sku, itemName, itemUnit, warehouseId, currentStock, safetyStock);
     }
 
     /** 조정 등으로 변동한 재고 수준(현재고·안전재고)을 도메인 상태로 동기화한다. id·sku·창고·감사 컬럼·version은 건드리지 않는다. */

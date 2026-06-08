@@ -215,7 +215,8 @@ public class StockController {
             @Valid @RequestBody StockAdjustmentRequest request) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         String executorEmpNo = JwtClaimExtractor.extractEmployeeNo(jwt);
-        StockAdjustmentResult result = stockAdjustmentService.adjust(request.toCommand(executorEmpNo));
+        String executorName = JwtClaimExtractor.extractName(jwt);
+        StockAdjustmentResult result = stockAdjustmentService.adjust(request.toCommand(executorEmpNo, executorName));
         return ResponseEntity.ok(StockAdjustmentResponse.from(result));
     }
 }

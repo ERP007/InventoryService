@@ -21,6 +21,7 @@ public final class JwtClaimExtractor {
 
     private static final String ROLE_CLAIM = "user_role";
     private static final String EMPLOYEE_NO_CLAIM = "employee_no";
+    private static final String NAME_CLAIM = "name";
     private static final String TENANCY_TYPE_CLAIM = "tenancy_type";
     private static final String TENANCY_CODE_CLAIM = "tenancy_code";
 
@@ -50,6 +51,11 @@ public final class JwtClaimExtractor {
     /** 사번(employee_no)을 반환한다. 누락 시 {@link ForbiddenException}. 생성·수정자 사번 snapshot 등에 사용한다. */
     public static String extractEmployeeNo(Jwt jwt) {
         return requireClaim(jwt.getClaimAsString(EMPLOYEE_NO_CLAIM));
+    }
+
+    /** 사원 이름(name)을 반환한다. 누락 시 {@link ForbiddenException}. 수행자 이름 snapshot 등에 사용한다. */
+    public static String extractName(Jwt jwt) {
+        return requireClaim(jwt.getClaimAsString(NAME_CLAIM));
     }
 
     /** 사용자에게 할당된 창고 코드(tenancy_code)를 반환한다. 누락 시 {@link ForbiddenException}. BRANCH 조회 범위 검증에 사용한다. */

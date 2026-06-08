@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.stock.controller.dto;
 
 import java.time.Instant;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 
@@ -12,6 +13,7 @@ public record StockResponse(
         Long id,
         String sku,
         String itemName,
+        ItemUnit itemUnit,
         Long warehouseId,
         String warehouseCode,
         String warehouseName,
@@ -26,6 +28,7 @@ public record StockResponse(
                 summary.id(),
                 summary.sku(),
                 summary.itemName(),
+                summary.itemUnit(),
                 summary.warehouseId(),
                 summary.warehouseCode(),
                 summary.warehouseName(),

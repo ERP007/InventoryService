@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
@@ -49,12 +50,12 @@ class StockMovementRepositoryAdapterTest {
         insertStock("HMC-EN-00214", "엔진오일 필터", 2L);
         insertStock("HMC-EN-00214", "엔진오일 필터", 5L);
         insertStock("HMC-BR-00788", "브레이크 패드", 2L);
-        // 이동 이력 (삽입 순서가 동일시각 tie-break의 id 순서가 된다)
-        insertMovement("HMC-EN-00214", 2L, 40, "INBOUND", null, "SO-1", 1, 40, instant("2026-05-15"));
-        insertMovement("HMC-EN-00214", 5L, -40, "OUTBOUND", null, "SO-1", 1, 460, instant("2026-05-15"));
-        insertMovement("HMC-BR-00788", 2L, 60, "INBOUND", null, "SO-2", 1, 60, instant("2026-05-20"));
-        insertMovement("HMC-EN-00214", 2L, 30, "INBOUND", null, "SO-3", 1, 70, instant("2026-06-03"));
-        insertMovement("HMC-EN-00214", 2L, -5, "ADJUST", "DAMAGE", null, null, 65, instant("2026-06-04"));
+        // 이동 이력 (삽입 순서가 동일시각 tie-break의 id 순서가 된다). 부품명·단위는 이동 이력 자체 스냅샷.
+        insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, 40, "INBOUND", null, "SO-1", 1, 40, instant("2026-05-15"));
+        insertMovement("HMC-EN-00214", "엔진오일 필터", 5L, -40, "OUTBOUND", null, "SO-1", 1, 460, instant("2026-05-15"));
+        insertMovement("HMC-BR-00788", "브레이크 패드", 2L, 60, "INBOUND", null, "SO-2", 1, 60, instant("2026-05-20"));
+        insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, 30, "INBOUND", null, "SO-3", 1, 70, instant("2026-06-03"));
+        insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, -5, "ADJUST", "DAMAGE", null, null, 65, instant("2026-06-04"));
     }
 
     @Test
@@ -202,7 +203,8 @@ class StockMovementRepositoryAdapterTest {
     @Test
     void save는_이동이력을_저장하고_식별자와_발생시각을_채운다() {
         StockMovement movement = StockMovement.createAdjustment(
-                "HMC-EN-00214", 2L, -3, MovementType.DECREASE, MovementReason.DAMAGE, 48, "파손", "HMC0001");
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, -3, MovementType.DECREASE, MovementReason.DAMAGE, 48,
+                "파손", "HMC0001", "홍길동");
 
         StockMovement saved = adapter.save(movement);
 
@@ -222,42 +224,51 @@ class StockMovementRepositoryAdapterTest {
         return LocalDate.parse(date).atTime(10, 0).atZone(ZONE).toInstant();
     }
 
-    private void insertMovement(String sku, long warehouseId, int delta, String type, String reason,
+    private void insertMovement(String sku, String itemName, long warehouseId, int delta, String type, String reason,
             String sourceRef, Integer sourceLineNo, int stockAfter, Instant performedAt) {
+        // 오일류는 L, 그 외는 EA로 단위를 스냅샷한다(테스트 시드용 단순 파생).
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
         entityManager().createNativeQuery("""
                         INSERT INTO stock_movement
-                            (sku, warehouse_id, delta, type, reason, source_ref, source_line_no,
-                             stock_after, memo, executor_emp_no, performed_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            (sku, item_name, item_unit, warehouse_id, delta, type, reason, source_ref, source_line_no,
+                             stock_after, note, executor_emp_no, executor_name, performed_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .setParameter(1, sku)
-                .setParameter(2, warehouseId)
-                .setParameter(3, delta)
-                .setParameter(4, type)
-                .setParameter(5, reason)
-                .setParameter(6, sourceRef)
-                .setParameter(7, sourceLineNo)
-                .setParameter(8, stockAfter)
-                .setParameter(9, null)
-                .setParameter(10, "HMC0001")
-                .setParameter(11, performedAt)
+                .setParameter(2, itemName)
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, delta)
+                .setParameter(6, type)
+                .setParameter(7, reason)
+                .setParameter(8, sourceRef)
+                .setParameter(9, sourceLineNo)
+                .setParameter(10, stockAfter)
+                .setParameter(11, null)
+                .setParameter(12, "HMC0001")
+                .setParameter(13, "홍길동")
+                .setParameter(14, performedAt)
                 .executeUpdate();
     }
 
     private void insertStock(String sku, String itemName, long warehouseId) {
+        // 오일류는 L, 그 외는 EA로 단위를 스냅샷한다(테스트 시드용 단순 파생).
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
         entityManager().createNativeQuery("""
                         INSERT INTO stock
-                            (sku, item_name, warehouse_id, current_stock, safety_stock, created_at, updated_at, version)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock,
+                             created_at, updated_at, version)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .setParameter(1, sku)
                 .setParameter(2, itemName)
-                .setParameter(3, warehouseId)
-                .setParameter(4, 100)
-                .setParameter(5, 50)
-                .setParameter(6, Instant.parse("2026-05-10T00:00:00Z"))
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, 100)
+                .setParameter(6, 50)
                 .setParameter(7, Instant.parse("2026-05-10T00:00:00Z"))
-                .setParameter(8, 0L)
+                .setParameter(8, Instant.parse("2026-05-10T00:00:00Z"))
+                .setParameter(9, 0L)
                 .executeUpdate();
     }
 

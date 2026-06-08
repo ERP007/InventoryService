@@ -1,5 +1,6 @@
 package com.fallguys.inventoryservice.stock.controller.dto;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 
 import jakarta.validation.constraints.NotBlank;
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 public record StockCreateRequest(
         @NotBlank String sku,
         @NotBlank String itemName,
+        @NotNull ItemUnit itemUnit,
         @NotBlank String warehouseCode,
         @NotNull @PositiveOrZero Integer quantity,
         @NotNull @PositiveOrZero Integer safetyStock
@@ -25,6 +27,6 @@ public record StockCreateRequest(
     }
 
     public CreateStockCommand toCommand() {
-        return new CreateStockCommand(sku, itemName, warehouseCode, quantity, safetyStock);
+        return new CreateStockCommand(sku, itemName, itemUnit, warehouseCode, quantity, safetyStock);
     }
 }
