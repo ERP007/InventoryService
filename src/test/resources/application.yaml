@@ -12,4 +12,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # 테스트(create-drop)에선 main의 import.sql을 로드하지 않는다 — 각 테스트가 @BeforeEach로 직접 시딩한다.
+        hbm2ddl:
+          import_files: ''
     open-in-view: false

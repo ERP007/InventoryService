@@ -16,6 +16,8 @@ import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundExcepti
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
@@ -165,6 +167,21 @@ class StockServiceTest {
             return Optional.of(new StockCreateResult(
                     1050L, saved.getSku(), "WH-SE-001", saved.getQuantity(), saved.getSafetyStock(),
                     Instant.parse("2026-05-28T14:36:00Z")));
+        }
+
+        @Override
+        public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
+            return List.of();
+        }
+
+        @Override
+        public StockStatusCount countByStatus(List<String> warehouseCodes) {
+            return new StockStatusCount(0, 0, 0);
+        }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            return Optional.empty();
         }
     }
 

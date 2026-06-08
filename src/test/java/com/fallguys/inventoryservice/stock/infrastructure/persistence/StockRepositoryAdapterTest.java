@@ -14,12 +14,15 @@ import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.AdjustmentType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 
@@ -171,6 +174,94 @@ class StockRepositoryAdapterTest {
         seedStocks();
 
         assertThat(adapter.findDetailByWarehouseCodeAndSku("WH-SE-001", "NO-SUCH-SKU")).isEmpty();
+    }
+
+    @Test
+    void findSkuWarehouseStocks_전체창고는_sku의_모든_창고행을_창고코드순으로_반환한다() {
+        seedStocks();
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
+
+        List<StockSkuRow> rows = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of());
+
+        assertThat(rows).extracting(StockSkuRow::warehouseCode).containsExactly("HQ-001", "WH-SE-001");
+        assertThat(rows).extracting(StockSkuRow::itemName).containsOnly("엔진오일 필터");
+    }
+
+    @Test
+    void findSkuWarehouseStocks_창고코드_필터는_해당_창고만_반환한다() {
+        seedStocks();
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100);
+
+        List<StockSkuRow> rows = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of("WH-SE-001"));
+
+        assertThat(rows).extracting(StockSkuRow::warehouseCode).containsExactly("WH-SE-001");
+        assertThat(rows.get(0).quantity()).isEqualTo(120);
+    }
+
+    @Test
+    void countByStatus_전체창고는_총_부족_무재고_포지션수를_센다() {
+        seedStocks();
+
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isEqualTo(4);
+        assertThat(counts.low()).isEqualTo(1);   // HMC-BR-00788 (30/40)
+        assertThat(counts.out()).isEqualTo(1);   // HMC-OIL-5W30 (0/60)
+    }
+
+    @Test
+    void countByStatus_창고필터는_해당_창고만_센다() {
+        seedStocks();
+
+        StockStatusCount counts = adapter.countByStatus(List.of("WH-SE-001"));
+
+        assertThat(counts.total()).isEqualTo(3);
+        assertThat(counts.low()).isEqualTo(1);
+        assertThat(counts.out()).isEqualTo(1);
+    }
+
+    @Test
+    void countByStatus_재고가_없으면_모두_0이다() {
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isZero();
+        assertThat(counts.low()).isZero();
+        assertThat(counts.out()).isZero();
+    }
+
+    @Test
+    void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
+        seedStocks();
+
+        Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+
+        assertThat(stock.getId()).isNotNull();
+        assertThat(stock.getWarehouseId()).isEqualTo(2L);
+        assertThat(stock.getQuantity()).isEqualTo(120);
+        assertThat(stock.getSafetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findBySkuAndWarehouseCode는_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "NO-WH")).isEmpty();
+        assertThat(adapter.findBySkuAndWarehouseCode("NO-SKU", "WH-SE-001")).isEmpty();
+    }
+
+    @Test
+    void save_기존재고는_현재고를_갱신한다() {
+        seedStocks();
+        Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+        int delta = stock.adjust(AdjustmentType.DECREASE, 20); // 120 → 100
+
+        adapter.save(stock);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        Stock reloaded = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
+        assertThat(delta).isEqualTo(-20);
+        assertThat(reloaded.getQuantity()).isEqualTo(100);
     }
 
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,

@@ -12,4 +12,9 @@ public class StockNotFoundException extends ResourceNotFoundException {
         super(StockErrorCode.STOCK_NOT_FOUND.getCode(),
                 "재고를 찾을 수 없습니다: warehouse=" + warehouseCode + ", sku=" + sku);
     }
+
+    /** sku 상세 패널 등 창고 무관 단건 조회의 미존재(존재 은닉 포함). */
+    public StockNotFoundException(String sku) {
+        super(StockErrorCode.STOCK_NOT_FOUND.getCode(), "재고를 찾을 수 없습니다: sku=" + sku);
+    }
 }

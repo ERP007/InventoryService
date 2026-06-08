@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
+import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
 
 public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
@@ -87,4 +89,52 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             """)
     Optional<StockDetail> findDetailByWarehouseCodeAndSku(
             @Param("warehouseCode") String warehouseCode, @Param("sku") String sku);
+
+    /**
+     * sku의 창고별 재고 행을 부품명·창고(code·name) 조인으로 조회한다(상세 패널).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인. warehouseCodes 필터는 hasWarehouseFilter로 on/off한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSkuRow(
+                s.itemName, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            ORDER BY w.code
+            """)
+    List<StockSkuRow> findSkuWarehouseStocks(
+            @Param("sku") String sku,
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes);
+
+    /**
+     * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.
+     * COUNT(CASE …)로 부족(0&lt;현재고&lt;안전)·무재고(현재고=0)를 세어 결과가 없어도 null 없이 0을 반환한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockStatusCount(
+                COUNT(s),
+                COUNT(CASE WHEN s.currentStock > 0 AND s.currentStock < s.safetyStock THEN 1 END),
+                COUNT(CASE WHEN s.currentStock = 0 THEN 1 END))
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            """)
+    StockStatusCount countByStatus(
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes);
+
+    /**
+     * 조정 대상 재고 엔티티를 (sku × 창고코드)로 조회한다(수정용).
+     * 엔티티가 영속 컨텍스트에 관리되어, 이어지는 update·flush에서 @Version 낙관락이 적용된다.
+     */
+    @Query("""
+            SELECT s
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku AND w.code = :warehouseCode
+            """)
+    Optional<StockEntity> findBySkuAndWarehouseCode(
+            @Param("sku") String sku, @Param("warehouseCode") String warehouseCode);
 }
