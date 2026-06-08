@@ -45,6 +45,11 @@ public class StockSkuDetailService {
         int totalQuantity = rows.stream().mapToInt(StockSkuRow::quantity).sum();
         int totalSafetyStock = rows.stream().mapToInt(StockSkuRow::safetyStock).sum();
         List<MovementHistory> history = stockMovementRepository.findRecentBySku(sku, scope, RECENT_HISTORY_LIMIT);
+        // TODO(Item 연동): 대분류·중분류를 Item 서비스에서 internal 조회해 StockSkuDetail에 담는다(현재는 응답에서 null).
+        //  - stock/domain에 의도 기반 DIP 인터페이스(예: ItemCategoryProvider) + VO(ItemCategory)를 정의해 주입하고 sku로 조회.
+        //  - 구현체는 stock/infrastructure/client(예: ItemFeignClient + ItemCategoryProviderAdapter, 에러 번역은 §10).
+        //  - StockSkuDetail에 majorCategory/middleCategory 필드를 추가해 여기서 채운다.
+        //  - 주의: 외부 호출은 이 readOnly DB 트랜잭션 밖에서 수행한다(네트워크 동안 DB 커넥션 점유 방지) → DB 조회와 분리할 것.
         return new StockSkuDetail(sku, rows.get(0).itemName(), rows.get(0).itemUnit(), totalQuantity, totalSafetyStock, rows, history);
     }
 }

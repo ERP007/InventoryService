@@ -28,6 +28,8 @@ public record StockSkuDetailResponse(
         List<MovementHistoryResponse> history = detail.history().stream()
                 .map(MovementHistoryResponse::from)
                 .toList();
+        // TODO(Item 연동): majorCategory·middleCategory는 현재 null. Item 서비스 internal 조회 연동 후
+        //  StockSkuDetail이 담아온 값(detail.majorCategory()/detail.middleCategory())으로 교체한다(외부 호출은 서비스 계층에서).
         return new StockSkuDetailResponse(
                 detail.sku(), detail.itemName(), detail.itemUnit(), null, null,
                 detail.totalQuantity(), detail.totalSafetyStock(), warehouse, history);
