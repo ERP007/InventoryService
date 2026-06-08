@@ -28,13 +28,13 @@ class StockAdjustmentServiceTest {
 
     private static AdjustStockCommand command(AdjustmentType type, int quantity) {
         return new AdjustStockCommand("HMC-EN-00214", "WH-SE-002", type, quantity,
-                MovementReason.DAMAGE, "메모", "HMC0001");
+                MovementReason.DAMAGE, "메모", "HMC0001", "홍길동");
     }
 
     @Test
     void DECREASE는_재고를_차감하고_이동이력을_저장한_결과를_반환한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", 2L, 51, 50);
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
         StubMovementRepository movementRepo = new StubMovementRepository();
         StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo);
 
@@ -51,12 +51,15 @@ class StockAdjustmentServiceTest {
         assertThat(movementRepo.saved.getType()).isEqualTo(MovementType.DECREASE);
         assertThat(movementRepo.saved.getStockAfter()).isEqualTo(48);
         assertThat(movementRepo.saved.getExecutorEmpNo()).isEqualTo("HMC0001");
+        assertThat(movementRepo.saved.getExecutorName()).isEqualTo("홍길동");
+        assertThat(movementRepo.saved.getItemName()).isEqualTo("엔진오일 필터");
+        assertThat(movementRepo.saved.getItemUnit()).isEqualTo(ItemUnit.EA);
     }
 
     @Test
     void ADJUST는_실측값으로_보정한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", 2L, 51, 50);
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
         StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository());
 
         StockAdjustmentResult result = service.adjust(command(AdjustmentType.ADJUST, 40));
@@ -78,7 +81,7 @@ class StockAdjustmentServiceTest {
     @Test
     void 차감이_가용재고_초과면_InsufficientStockException이고_이력을_저장하지_않는다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", 2L, 51, 50);
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
         StubMovementRepository movementRepo = new StubMovementRepository();
         StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo);
 
@@ -90,7 +93,7 @@ class StockAdjustmentServiceTest {
     @Test
     void 변동이_없으면_NoStockChangeException() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", 2L, 50, 50);
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 50, 50);
         StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository());
 
         assertThatThrownBy(() -> service.adjust(command(AdjustmentType.ADJUST, 50)))
@@ -149,9 +152,10 @@ class StockAdjustmentServiceTest {
         @Override
         public StockMovement save(StockMovement movement) {
             this.saved = movement;
-            return StockMovement.of(88231L, movement.getSku(), movement.getWarehouseId(), movement.getDelta(),
-                    movement.getType(), movement.getReason(), movement.getSourceRef(), movement.getSourceLineNo(),
-                    movement.getStockAfter(), movement.getMemo(), movement.getExecutorEmpNo(),
+            return StockMovement.of(88231L, movement.getSku(), movement.getItemName(), movement.getItemUnit(),
+                    movement.getWarehouseId(), movement.getDelta(), movement.getType(), movement.getReason(),
+                    movement.getSourceRef(), movement.getSourceLineNo(), movement.getStockAfter(),
+                    movement.getNote(), movement.getExecutorEmpNo(), movement.getExecutorName(),
                     Instant.parse("2026-05-28T14:35:00Z"));
         }
 

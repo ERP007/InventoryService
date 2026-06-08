@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.AdjustmentType;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
@@ -46,7 +47,7 @@ class StockRepositoryAdapterTest {
 
     @Test
     void save하면_id를_발급하고_findResultById가_창고코드를_조인하며_createdAt이_채워진다() {
-        Long id = adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", 2L, 100, 50));
+        Long id = adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
 
         assertThat(id).isNotNull();
 
@@ -61,7 +62,7 @@ class StockRepositoryAdapterTest {
 
     @Test
     void existsBySkuAndWarehouseId는_저장된_조합에만_true다() {
-        adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", 2L, 100, 50));
+        adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
 
         assertThat(adapter.existsBySkuAndWarehouseId("HMC-EN-00214", 2L)).isTrue();
         assertThat(adapter.existsBySkuAndWarehouseId("HMC-EN-00214", 999L)).isFalse();
@@ -277,19 +278,23 @@ class StockRepositoryAdapterTest {
     }
 
     private void insertStock(String sku, String itemName, long warehouseId, int currentStock, int safetyStock) {
+        // 오일류는 L, 그 외는 EA로 단위를 스냅샷한다(테스트 시드용 단순 파생).
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
         entityManager().createNativeQuery("""
                         INSERT INTO stock
-                            (sku, item_name, warehouse_id, current_stock, safety_stock, created_at, updated_at, version)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock,
+                             created_at, updated_at, version)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .setParameter(1, sku)
                 .setParameter(2, itemName)
-                .setParameter(3, warehouseId)
-                .setParameter(4, currentStock)
-                .setParameter(5, safetyStock)
-                .setParameter(6, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, currentStock)
+                .setParameter(6, safetyStock)
                 .setParameter(7, Instant.parse("2026-05-20T00:00:00Z"))
-                .setParameter(8, 0L)
+                .setParameter(8, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(9, 0L)
                 .executeUpdate();
     }
 

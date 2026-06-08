@@ -28,8 +28,8 @@ class StockSkuDetailServiceTest {
     void ADMIN은_전사범위로_조회하고_합계와_이력을_조립한다() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.rows = List.of(
-                new StockSkuRow("엔진오일 필터", 2L, "WH-SE-001", "서울 1창고", 48, 50),
-                new StockSkuRow("엔진오일 필터", 1L, "HQ-001", "본사", 100, 100));
+                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50),
+                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
         StubMovementRepository movementRepo = new StubMovementRepository();
         movementRepo.history = List.of(
                 new MovementHistory(MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
@@ -50,7 +50,7 @@ class StockSkuDetailServiceTest {
     @Test
     void BRANCH는_자기창고로_범위를_강제한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", 2L, "WH-SE-001", "서울 1창고", 48, 50));
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50));
         StubMovementRepository movementRepo = new StubMovementRepository();
         StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo);
 

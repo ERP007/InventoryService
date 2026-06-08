@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
@@ -66,7 +67,7 @@ class StockMovementControllerTest {
                 .andExpect(jsonPath("$.content[0].warehouseName").value("서울 1창고"))
                 .andExpect(jsonPath("$.content[0].delta").value(-3))
                 .andExpect(jsonPath("$.content[0].type").value("ADJUST"))
-                .andExpect(jsonPath("$.content[0].unit").value("개"))
+                .andExpect(jsonPath("$.content[0].unit").value("EA"))
                 .andExpect(jsonPath("$.content[0].reason").value("DAMAGE"))
                 .andExpect(jsonPath("$.content[0].sourceRef").value("ADJ-88231"))
                 .andExpect(jsonPath("$.content[0].executorEmpNo").value("HMC2001"))
@@ -126,10 +127,10 @@ class StockMovementControllerTest {
                 @Override
                 public MovementSummaryPage search(MovementSearchQuery query) {
                     MovementSummary adjust = new MovementSummary(
-                            88231L, Instant.parse("2026-05-28T14:35:00Z"), "HMC-EN-00214", "엔진오일 필터",
+                            88231L, Instant.parse("2026-05-28T14:35:00Z"), "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA,
                             "WH-SE-001", "서울 1창고", -3, MovementType.ADJUST, MovementReason.DAMAGE, null, "HMC2001");
                     MovementSummary inbound = new MovementSummary(
-                            88230L, Instant.parse("2026-05-20T14:22:00Z"), "HMC-EN-00214", "엔진오일 필터",
+                            88230L, Instant.parse("2026-05-20T14:22:00Z"), "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA,
                             "WH-SE-001", "서울 1창고", 40, MovementType.INBOUND, null, "SO-202605-00001", "HMC2001");
                     return new MovementSummaryPage(List.of(adjust, inbound), query.page(), query.size(), 2, 1);
                 }

@@ -39,7 +39,7 @@ class StockServiceTest {
         StockService service = new StockService(stockRepository, warehouseRepository);
 
         StockCreateResult result = service.create(
-                new CreateStockCommand("HMC-EN-00214", "엔진오일 필터", "WH-SE-001", 100, 50));
+                new CreateStockCommand("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, "WH-SE-001", 100, 50));
 
         assertThat(result.stockId()).isEqualTo(1050L);
         assertThat(result.sku()).isEqualTo("HMC-EN-00214");
@@ -55,7 +55,7 @@ class StockServiceTest {
         StockService service = new StockService(stockRepository, new StubWarehouseRepository(null));
 
         assertThatThrownBy(() -> service.create(
-                new CreateStockCommand("SKU", "부품", "NOPE", 10, 10)))
+                new CreateStockCommand("SKU", "부품", ItemUnit.EA, "NOPE", 10, 10)))
                 .isInstanceOf(WarehouseNotFoundException.class);
         assertThat(stockRepository.saved).isNull();
     }
@@ -67,7 +67,7 @@ class StockServiceTest {
         StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
 
         assertThatThrownBy(() -> service.create(
-                new CreateStockCommand("HMC-EN-00214", "부품", "WH-SE-001", 10, 10)))
+                new CreateStockCommand("HMC-EN-00214", "부품", ItemUnit.EA, "WH-SE-001", 10, 10)))
                 .isInstanceOf(StockAlreadyExistsException.class);
         assertThat(stockRepository.saved).isNull();
     }
