@@ -45,6 +45,6 @@ public class StockSkuDetailService {
         int totalQuantity = rows.stream().mapToInt(StockSkuRow::quantity).sum();
         int totalSafetyStock = rows.stream().mapToInt(StockSkuRow::safetyStock).sum();
         List<MovementHistory> history = stockMovementRepository.findRecentBySku(sku, scope, RECENT_HISTORY_LIMIT);
-        return new StockSkuDetail(sku, rows.get(0).itemName(), totalQuantity, totalSafetyStock, rows, history);
+        return new StockSkuDetail(sku, rows.get(0).itemName(), rows.get(0).itemUnit(), totalQuantity, totalSafetyStock, rows, history);
     }
 }

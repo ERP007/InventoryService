@@ -18,8 +18,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
     /**
      * 조회 조건으로 이동 이력을 검색해 읽기 모델(MovementSummary)로 투영한다.
      *
-     * 조인: WarehouseEntity(창고 코드·이름)는 INNER, StockEntity(부품명 스냅샷)는 LEFT로 (sku × warehouse) 매칭.
-     *       재고 행이 없어도 이력은 노출된다. 부품명은 잠정적으로 stock 스냅샷을 쓰며, 추후 Item 마스터 기준으로 대체한다(TODO).
+     * 조인: WarehouseEntity(창고 코드·이름)만 INNER로 매칭한다. 부품명·단위는 이동 이력 자체 스냅샷(m.itemName·m.itemUnit)을 쓴다.
      * 필터(각 조건은 파라미터로 on/off):
      *   - keyword: 부품명/SKU 부분 일치(대소문자 무시, 호출부가 소문자 LIKE 패턴을 만들어 전달).
      *   - warehouseCodes: hasWarehouseFilter=true일 때만 w.code IN 으로 제한.
@@ -29,12 +28,11 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
      */
     @Query(value = """
             SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementSummary(
-                m.id, m.performedAt, m.sku, s.itemName, w.code, w.name,
+                m.id, m.performedAt, m.sku, m.itemName, m.itemUnit, w.code, w.name,
                 m.delta, m.type, m.reason, m.sourceRef, m.executorEmpNo)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
-            LEFT JOIN StockEntity s ON s.sku = m.sku AND s.warehouseId = m.warehouseId
-            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
+            WHERE (:keyword IS NULL OR LOWER(m.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:type IS NULL OR m.type = :type)
               AND m.performedAt >= :fromInstant
@@ -44,8 +42,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             SELECT COUNT(m)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
-            LEFT JOIN StockEntity s ON s.sku = m.sku AND s.warehouseId = m.warehouseId
-            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
+            WHERE (:keyword IS NULL OR LOWER(m.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:type IS NULL OR m.type = :type)
               AND m.performedAt >= :fromInstant

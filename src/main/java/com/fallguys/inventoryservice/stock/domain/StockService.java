@@ -99,7 +99,8 @@ public class StockService {
         }
 
         Stock stock = Stock.create(
-                command.sku(), command.itemName(), warehouseId, command.quantity(), command.safetyStock());
+                command.sku(), command.itemName(), command.itemUnit(), warehouseId,
+                command.quantity(), command.safetyStock());
         Long id = stockRepository.save(stock);
 
         return stockRepository.findResultById(id)

@@ -29,7 +29,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
      */
     @Query(value = """
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSummary(
-                s.id, s.sku, s.itemName, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, s.updatedAt)
+                s.id, s.sku, s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, s.updatedAt)
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
             WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
@@ -96,7 +96,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSkuRow(
-                s.itemName, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock)
+                s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock)
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
             WHERE s.sku = :sku
