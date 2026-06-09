@@ -11,6 +11,7 @@ public record MovementHistory(
         MovementType type,
         int delta,
         String executorEmpNo,
+        String executorName,
         Instant occurredAt
 ) {
 }

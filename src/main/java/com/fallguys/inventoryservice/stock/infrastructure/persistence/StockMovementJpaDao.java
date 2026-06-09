@@ -63,7 +63,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementHistory(
-                m.type, m.delta, m.executorEmpNo, m.performedAt)
+                m.type, m.delta, m.executorEmpNo, m.executorName, m.performedAt)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
             WHERE m.sku = :sku

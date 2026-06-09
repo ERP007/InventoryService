@@ -34,7 +34,7 @@ class StockSkuDetailServiceTest {
                 new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
         StubMovementRepository movementRepo = new StubMovementRepository();
         movementRepo.history = List.of(
-                new MovementHistory(MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
+                new MovementHistory(MovementType.OUTBOUND, -18, "AD002", "홍길동", Instant.parse("2026-05-20T14:22:00Z")));
         StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo, sku -> Optional.empty());
 
         StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);

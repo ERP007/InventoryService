@@ -272,7 +272,8 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.warehouse[1].status").value("NORMAL"))
                 .andExpect(jsonPath("$.history[0].type").value("OUTBOUND"))
                 .andExpect(jsonPath("$.history[0].delta").value(-18))
-                .andExpect(jsonPath("$.history[0].executorEmpNo").value("AD002"));
+                .andExpect(jsonPath("$.history[0].executorEmpNo").value("AD002"))
+                .andExpect(jsonPath("$.history[0].executorName").value("홍길동"));
     }
 
     @Test
@@ -515,7 +516,7 @@ class StockControllerTest {
                 @Override
                 public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
                     return List.of(new MovementHistory(
-                            MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
+                            MovementType.OUTBOUND, -18, "AD002", "홍길동", Instant.parse("2026-05-20T14:22:00Z")));
                 }
 
                 @Override
