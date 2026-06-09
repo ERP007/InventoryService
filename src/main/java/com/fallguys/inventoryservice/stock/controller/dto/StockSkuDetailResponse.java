@@ -7,7 +7,7 @@ import com.fallguys.inventoryservice.stock.domain.query.StockSkuDetail;
 
 /**
  * sku 상세 패널 응답. 창고별 재고(warehouse[])와 전체 합계, 최근 이동 이력(history[])을 포함한다.
- * majorCategory(대분류)·middleCategory(중분류)는 Item 마스터 소관이라 추후 internal 조회로 채운다(현재는 null).
+ * majorCategory(대분류)·middleCategory(중분류)는 외부 Item 서비스 조회 결과이며, 통합 비활성/실패 시 null이다.
  */
 public record StockSkuDetailResponse(
         String sku,
@@ -28,10 +28,9 @@ public record StockSkuDetailResponse(
         List<MovementHistoryResponse> history = detail.history().stream()
                 .map(MovementHistoryResponse::from)
                 .toList();
-        // TODO(Item 연동): majorCategory·middleCategory는 현재 null. Item 서비스 internal 조회 연동 후
-        //  StockSkuDetail이 담아온 값(detail.majorCategory()/detail.middleCategory())으로 교체한다(외부 호출은 서비스 계층에서).
         return new StockSkuDetailResponse(
-                detail.sku(), detail.itemName(), detail.itemUnit(), null, null,
+                detail.sku(), detail.itemName(), detail.itemUnit(),
+                detail.majorCategory(), detail.middleCategory(),
                 detail.totalQuantity(), detail.totalSafetyStock(), warehouse, history);
     }
 }
