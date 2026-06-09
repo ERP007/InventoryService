@@ -10,7 +10,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.ItemCategory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
@@ -33,7 +35,7 @@ class StockSkuDetailServiceTest {
         StubMovementRepository movementRepo = new StubMovementRepository();
         movementRepo.history = List.of(
                 new MovementHistory(MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo);
+        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo, sku -> Optional.empty());
 
         StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
 
@@ -52,7 +54,7 @@ class StockSkuDetailServiceTest {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50));
         StubMovementRepository movementRepo = new StubMovementRepository();
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo);
+        StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo, sku -> Optional.empty());
 
         service.getSkuDetail("HMC-EN-00214", TenancyType.BRANCH, "WH-SE-001");
 
@@ -64,10 +66,52 @@ class StockSkuDetailServiceTest {
     void 범위내_재고가_없으면_StockNotFoundException() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.rows = List.of();
-        StockSkuDetailService service = new StockSkuDetailService(stockRepo, new StubMovementRepository());
+        StockSkuDetailService service = new StockSkuDetailService(stockRepo, new StubMovementRepository(), sku -> Optional.empty());
 
         assertThatThrownBy(() -> service.getSkuDetail("NO-SUCH", TenancyType.ADMIN, null))
                 .isInstanceOf(StockNotFoundException.class);
+    }
+
+    @Test
+    void Item에서_대분류_중분류를_받아_상세에_채운다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        StockSkuDetailService service = new StockSkuDetailService(
+                stockRepo, new StubMovementRepository(),
+                sku -> Optional.of(new ItemCategory("엔진", "오일필터")));
+
+        StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
+
+        assertThat(detail.majorCategory()).isEqualTo("엔진");
+        assertThat(detail.middleCategory()).isEqualTo("오일필터");
+    }
+
+    @Test
+    void Item카테고리가_없으면_대분류_중분류는_null() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        StockSkuDetailService service = new StockSkuDetailService(
+                stockRepo, new StubMovementRepository(), sku -> Optional.empty());
+
+        StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
+
+        assertThat(detail.majorCategory()).isNull();
+        assertThat(detail.middleCategory()).isNull();
+    }
+
+    @Test
+    void Item호출이_실패하면_대분류_중분류를_null로_강등한다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        StockSkuDetailService service = new StockSkuDetailService(
+                stockRepo, new StubMovementRepository(),
+                sku -> { throw new ItemServiceUnavailableException("stub 실패", new RuntimeException()); });
+
+        StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
+
+        assertThat(detail.majorCategory()).isNull();
+        assertThat(detail.middleCategory()).isNull();
+        assertThat(detail.itemName()).isEqualTo("엔진오일 필터"); // 패널 자체는 정상 반환(강등만)
     }
 
     private static final class StubStockRepository implements StockRepository {

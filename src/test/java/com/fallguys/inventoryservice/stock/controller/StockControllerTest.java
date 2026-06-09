@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.stock.domain.ItemCategoryProvider;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
@@ -417,8 +418,14 @@ class StockControllerTest {
 
         @Bean
         StockSkuDetailService stockSkuDetailService(StockRepository stockRepository,
-                                                    StockMovementRepository stockMovementRepository) {
-            return new StockSkuDetailService(stockRepository, stockMovementRepository);
+                                                    StockMovementRepository stockMovementRepository,
+                                                    ItemCategoryProvider itemCategoryProvider) {
+            return new StockSkuDetailService(stockRepository, stockMovementRepository, itemCategoryProvider);
+        }
+
+        @Bean
+        ItemCategoryProvider itemCategoryProvider() {
+            return sku -> Optional.empty();
         }
 
         @Bean
