@@ -15,10 +15,12 @@ import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsEx
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.WarehouseStockQuery;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
@@ -130,6 +132,32 @@ class StockServiceTest {
         assertThat(detail.safetyStock()).isZero();
     }
 
+    @Test
+    void getStockQuantities_창고가_있으면_재고수량_리스트를_반환한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        stockRepository.quantities = List.of(
+                new StockQuantity("HMC-EN-00214", 120, 50),
+                new StockQuantity("HMC-BR-00788", 30, 40));
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L));
+
+        List<StockQuantity> result = service.getStockQuantities(
+                WarehouseStockQuery.of("WH-SE-001", "HMC-EN-00214,HMC-BR-00788"));
+
+        assertThat(result).extracting(StockQuantity::sku).containsExactly("HMC-EN-00214", "HMC-BR-00788");
+        assertThat(stockRepository.quantitiesWarehouseCode).isEqualTo("WH-SE-001");
+        assertThat(stockRepository.quantitiesSkus).containsExactly("HMC-EN-00214", "HMC-BR-00788");
+    }
+
+    @Test
+    void getStockQuantities_창고가_없으면_WarehouseNotFoundException을_던지고_조회하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(null));
+
+        assertThatThrownBy(() -> service.getStockQuantities(WarehouseStockQuery.of("NOPE", "HMC-EN-00214")))
+                .isInstanceOf(WarehouseNotFoundException.class);
+        assertThat(stockRepository.quantitiesQueried).isFalse();
+    }
+
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
         private Stock saved;
@@ -137,6 +165,10 @@ class StockServiceTest {
         private StockSearchQuery searchArg;
         private StockDetail detailResult;
         private boolean detailQueried = false;
+        private List<StockQuantity> quantities = List.of();
+        private boolean quantitiesQueried = false;
+        private String quantitiesWarehouseCode;
+        private List<String> quantitiesSkus;
 
         @Override
         public StockSummaryPage search(StockSearchQuery query) {
@@ -148,6 +180,14 @@ class StockServiceTest {
         public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
             this.detailQueried = true;
             return Optional.ofNullable(detailResult);
+        }
+
+        @Override
+        public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+            this.quantitiesQueried = true;
+            this.quantitiesWarehouseCode = warehouseCode;
+            this.quantitiesSkus = skus;
+            return quantities;
         }
 
         @Override
@@ -214,7 +254,7 @@ class StockServiceTest {
 
         @Override
         public boolean existsByCode(String code) {
-            return false;
+            return warehouseId != null;
         }
 
         @Override

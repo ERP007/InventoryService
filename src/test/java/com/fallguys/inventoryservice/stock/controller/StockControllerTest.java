@@ -40,6 +40,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
@@ -460,6 +461,11 @@ class StockControllerTest {
                         return Optional.of(new StockDetail("WH-SE-001", "EO-5W30-1L", 48, 50));
                     }
                     return Optional.empty();
+                }
+
+                @Override
+                public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+                    return List.of();
                 }
 
                 @Override

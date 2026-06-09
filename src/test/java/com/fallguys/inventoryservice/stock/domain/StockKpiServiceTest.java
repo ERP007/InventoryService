@@ -15,6 +15,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockKpi;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
@@ -74,6 +75,11 @@ class StockKpiServiceTest {
         @Override
         public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
             return Optional.empty();
+        }
+
+        @Override
+        public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+            return List.of();
         }
 
         @Override

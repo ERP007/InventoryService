@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
@@ -89,6 +90,21 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             """)
     Optional<StockDetail> findDetailByWarehouseCodeAndSku(
             @Param("warehouseCode") String warehouseCode, @Param("sku") String sku);
+
+    /**
+     * (창고 코드 × SKU 집합)의 현재고·안전재고를 일괄 투영한다(내부 일괄 조회).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인해 창고 코드로 한정한다.
+     * 재고 행이 없는 SKU는 결과에 포함되지 않는다(호출 측이 0으로 간주).
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockQuantity(
+                s.sku, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE w.code = :warehouseCode AND s.sku IN :skus
+            """)
+    List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(
+            @Param("warehouseCode") String warehouseCode, @Param("skus") List<String> skus);
 
     /**
      * sku의 창고별 재고 행을 부품명·창고(code·name) 조인으로 조회한다(상세 패널).

@@ -20,6 +20,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
@@ -175,6 +176,21 @@ class StockRepositoryAdapterTest {
         seedStocks();
 
         assertThat(adapter.findDetailByWarehouseCodeAndSku("WH-SE-001", "NO-SUCH-SKU")).isEmpty();
+    }
+
+    @Test
+    void findQuantitiesByWarehouseCodeAndSkus는_해당창고_존재SKU만_반환하고_없는SKU와_타창고는_제외한다() {
+        seedStocks();
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
+
+        List<StockQuantity> rows = adapter.findQuantitiesByWarehouseCodeAndSkus(
+                "WH-SE-001", List.of("HMC-EN-00214", "HMC-BR-00788", "NO-SUCH"));
+
+        assertThat(rows).extracting(StockQuantity::sku)
+                .containsExactlyInAnyOrder("HMC-EN-00214", "HMC-BR-00788"); // NO-SUCH 생략
+        StockQuantity en = rows.stream().filter(r -> r.sku().equals("HMC-EN-00214")).findFirst().orElseThrow();
+        assertThat(en.quantity()).isEqualTo(120);   // WH-SE-001 값(HQ-001의 500이 아님)
+        assertThat(en.safetyStock()).isEqualTo(50);
     }
 
     @Test
