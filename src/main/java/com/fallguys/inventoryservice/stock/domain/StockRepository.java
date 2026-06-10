@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
@@ -20,6 +21,9 @@ public interface StockRepository {
 
     /** (창고 코드 × sku) 단건 재고를 조회한다. 재고 행이 없으면 empty(빈 stock fallback은 서비스가 결정). */
     Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku);
+
+    /** (창고 코드 × SKU 집합)의 현재고·안전재고를 일괄 조회한다(내부 호출). 재고 행이 없는 SKU는 결과에서 생략된다. */
+    List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus);
 
     /** (sku × warehouse) 조합의 재고 존재 여부. 신규 생성 전 중복 검사에 사용한다. */
     boolean existsBySkuAndWarehouseId(String sku, Long warehouseId);
@@ -38,4 +42,10 @@ public interface StockRepository {
 
     /** 조정 대상 재고를 (sku × warehouseCode)로 조회한다(수정용 — 같은 트랜잭션에서 save 시 @Version 적용). 없으면 empty. */
     Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode);
+
+    /**
+     * 출고 대상 재고를 (sku × warehouseId)로 비관락(PESSIMISTIC_WRITE)으로 조회한다(출고용 — 동시 차감을 직렬화해 음수 재고를 막는다).
+     * 잠금은 트랜잭션 커밋/롤백까지 유지되며, 잠금 대기 초과는 PessimisticLockingFailureException(LOCK_TIMEOUT, 409)으로 매핑된다. 없으면 empty.
+     */
+    Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId);
 }

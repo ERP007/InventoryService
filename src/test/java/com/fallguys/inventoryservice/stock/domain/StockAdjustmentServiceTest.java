@@ -19,6 +19,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockAdjustmentResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
@@ -110,6 +111,11 @@ class StockAdjustmentServiceTest {
         }
 
         @Override
+        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+            return Optional.ofNullable(stock);
+        }
+
+        @Override
         public Long save(Stock stock) {
             this.savedQuantity = stock.getQuantity();
             return stock.getId();
@@ -123,6 +129,11 @@ class StockAdjustmentServiceTest {
         @Override
         public Optional<StockDetail> findDetailByWarehouseCodeAndSku(String warehouseCode, String sku) {
             return Optional.empty();
+        }
+
+        @Override
+        public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+            return List.of();
         }
 
         @Override
@@ -157,6 +168,18 @@ class StockAdjustmentServiceTest {
                     movement.getSourceRef(), movement.getSourceLineNo(), movement.getStockAfter(),
                     movement.getNote(), movement.getExecutorEmpNo(), movement.getExecutorName(),
                     Instant.parse("2026-05-28T14:35:00Z"));
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
         }
 
         @Override

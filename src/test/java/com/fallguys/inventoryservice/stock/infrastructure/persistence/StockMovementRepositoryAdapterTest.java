@@ -20,11 +20,13 @@ import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
+import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 import jakarta.persistence.EntityManager;
 
@@ -213,6 +215,42 @@ class StockMovementRepositoryAdapterTest {
         assertThat(saved.getDelta()).isEqualTo(-3);
         assertThat(saved.getType()).isEqualTo(MovementType.DECREASE);
         assertThat(saved.getReason()).isEqualTo(MovementReason.DAMAGE);
+    }
+
+    @Test
+    void findInboundBySourceRefAndWarehouseCode_해당창고_INBOUND만_반환한다() {
+        // SO-1: WH-SE-001 INBOUND(+40, stock_after 40), HQ-001 OUTBOUND(-40) → WH-SE-001 조회 시 INBOUND만.
+        List<InboundMovement> rows = adapter.findInboundBySourceRefAndWarehouseCode("SO-1", "WH-SE-001");
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).sku()).isEqualTo("HMC-EN-00214");
+        assertThat(rows.get(0).delta()).isEqualTo(40);
+        assertThat(rows.get(0).currentQuantity()).isEqualTo(40); // stock_after
+    }
+
+    @Test
+    void findInboundBySourceRefAndWarehouseCode_INBOUND이_없으면_빈리스트다() {
+        // HQ-001의 SO-1은 OUTBOUND뿐이라 type 필터에서 제외된다.
+        assertThat(adapter.findInboundBySourceRefAndWarehouseCode("SO-1", "HQ-001")).isEmpty();
+        assertThat(adapter.findInboundBySourceRefAndWarehouseCode("NO-SUCH", "WH-SE-001")).isEmpty();
+    }
+
+    @Test
+    void findOutboundBySourceRefAndWarehouseCode_해당창고_OUTBOUND만_반환한다() {
+        // SO-1: WH-SE-001 INBOUND(+40), HQ-001 OUTBOUND(-40, stock_after 460) → HQ-001 조회 시 OUTBOUND만.
+        List<OutboundMovement> rows = adapter.findOutboundBySourceRefAndWarehouseCode("SO-1", "HQ-001");
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).sku()).isEqualTo("HMC-EN-00214");
+        assertThat(rows.get(0).delta()).isEqualTo(-40);
+        assertThat(rows.get(0).currentQuantity()).isEqualTo(460); // stock_after
+    }
+
+    @Test
+    void findOutboundBySourceRefAndWarehouseCode_OUTBOUND이_없으면_빈리스트다() {
+        // WH-SE-001의 SO-1은 INBOUND뿐이라 type 필터에서 제외된다.
+        assertThat(adapter.findOutboundBySourceRefAndWarehouseCode("SO-1", "WH-SE-001")).isEmpty();
+        assertThat(adapter.findOutboundBySourceRefAndWarehouseCode("NO-SUCH", "HQ-001")).isEmpty();
     }
 
     private static MovementSearchQuery query(String keyword, List<String> warehouseCodes, MovementType type,

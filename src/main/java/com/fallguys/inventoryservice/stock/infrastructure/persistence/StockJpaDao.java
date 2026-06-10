@@ -6,11 +6,17 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummary;
@@ -91,6 +97,21 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             @Param("warehouseCode") String warehouseCode, @Param("sku") String sku);
 
     /**
+     * (창고 코드 × SKU 집합)의 현재고·안전재고를 일괄 투영한다(내부 일괄 조회).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인해 창고 코드로 한정한다.
+     * 재고 행이 없는 SKU는 결과에 포함되지 않는다(호출 측이 0으로 간주).
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.StockQuantity(
+                s.sku, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE w.code = :warehouseCode AND s.sku IN :skus
+            """)
+    List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(
+            @Param("warehouseCode") String warehouseCode, @Param("skus") List<String> skus);
+
+    /**
      * sku의 창고별 재고 행을 부품명·창고(code·name) 조인으로 조회한다(상세 패널).
      * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인. warehouseCodes 필터는 hasWarehouseFilter로 on/off한다.
      */
@@ -137,4 +158,21 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             """)
     Optional<StockEntity> findBySkuAndWarehouseCode(
             @Param("sku") String sku, @Param("warehouseCode") String warehouseCode);
+
+    /**
+     * 출고 대상 재고 엔티티를 (sku × warehouseId)로 비관락(SELECT … FOR UPDATE)으로 조회한다.
+     * 같은 (sku × warehouse) 행에 대한 동시 출고를 직렬화해 가용재고 검증과 차감 사이의 경합(음수 재고)을 막는다.
+     * stock 단일 테이블만 잠그도록 warehouse 조인 없이 warehouse_id로 직접 매칭한다(호출부가 코드→id를 미리 해석).
+     * jakarta.persistence.lock.timeout(ms) 힌트로 잠금 대기 상한을 둔다(초과 시 LockTimeoutException → 409 LOCK_TIMEOUT).
+     * (PostgreSQL은 timeout=0이면 FOR UPDATE NOWAIT, 양수 대기는 세션 lock_timeout에 의존한다.)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("""
+            SELECT s
+            FROM StockEntity s
+            WHERE s.sku = :sku AND s.warehouseId = :warehouseId
+            """)
+    Optional<StockEntity> findBySkuAndWarehouseIdForUpdate(
+            @Param("sku") String sku, @Param("warehouseId") Long warehouseId);
 }

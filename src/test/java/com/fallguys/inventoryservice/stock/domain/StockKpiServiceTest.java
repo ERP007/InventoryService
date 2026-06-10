@@ -15,6 +15,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockKpi;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
@@ -77,6 +78,11 @@ class StockKpiServiceTest {
         }
 
         @Override
+        public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+            return List.of();
+        }
+
+        @Override
         public boolean existsBySkuAndWarehouseId(String sku, Long warehouseId) {
             return false;
         }
@@ -98,6 +104,11 @@ class StockKpiServiceTest {
 
         @Override
         public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
             return Optional.empty();
         }
     }
@@ -127,6 +138,18 @@ class StockKpiServiceTest {
         @Override
         public StockMovement save(StockMovement movement) {
             return movement;
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
         }
     }
 }

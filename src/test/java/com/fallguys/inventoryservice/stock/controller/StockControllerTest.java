@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.stock.domain.ItemInfoProvider;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
@@ -39,6 +40,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
@@ -271,7 +273,8 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.warehouse[1].status").value("NORMAL"))
                 .andExpect(jsonPath("$.history[0].type").value("OUTBOUND"))
                 .andExpect(jsonPath("$.history[0].delta").value(-18))
-                .andExpect(jsonPath("$.history[0].executorEmpNo").value("AD002"));
+                .andExpect(jsonPath("$.history[0].executorEmpNo").value("AD002"))
+                .andExpect(jsonPath("$.history[0].executorName").value("홍길동"));
     }
 
     @Test
@@ -417,8 +420,14 @@ class StockControllerTest {
 
         @Bean
         StockSkuDetailService stockSkuDetailService(StockRepository stockRepository,
-                                                    StockMovementRepository stockMovementRepository) {
-            return new StockSkuDetailService(stockRepository, stockMovementRepository);
+                                                    StockMovementRepository stockMovementRepository,
+                                                    ItemInfoProvider itemInfoProvider) {
+            return new StockSkuDetailService(stockRepository, stockMovementRepository, itemInfoProvider);
+        }
+
+        @Bean
+        ItemInfoProvider itemInfoProvider() {
+            return sku -> Optional.empty();
         }
 
         @Bean
@@ -452,6 +461,11 @@ class StockControllerTest {
                         return Optional.of(new StockDetail("WH-SE-001", "EO-5W30-1L", 48, 50));
                     }
                     return Optional.empty();
+                }
+
+                @Override
+                public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+                    return List.of();
                 }
 
                 @Override
@@ -494,6 +508,11 @@ class StockControllerTest {
                     }
                     return Optional.empty();
                 }
+
+                @Override
+                public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+                    return Optional.empty();
+                }
             };
         }
 
@@ -508,12 +527,24 @@ class StockControllerTest {
                 @Override
                 public List<MovementHistory> findRecentBySku(String sku, List<String> warehouseCodes, int limit) {
                     return List.of(new MovementHistory(
-                            MovementType.OUTBOUND, -18, "AD002", Instant.parse("2026-05-20T14:22:00Z")));
+                            MovementType.OUTBOUND, -18, "AD002", "홍길동", Instant.parse("2026-05-20T14:22:00Z")));
                 }
 
                 @Override
                 public long countRecent(List<String> warehouseCodes, Instant since) {
                     return 8;
+                }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
+                }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
                 }
 
                 @Override

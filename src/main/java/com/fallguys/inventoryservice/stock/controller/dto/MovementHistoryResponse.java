@@ -12,11 +12,12 @@ public record MovementHistoryResponse(
         MovementType type,
         int delta,
         String executorEmpNo,
+        String executorName, // stock movement db에 사원 이름 반정규화 후 추가
         Instant occurredAt
 ) {
 
     public static MovementHistoryResponse from(MovementHistory history) {
         return new MovementHistoryResponse(
-                history.type(), history.delta(), history.executorEmpNo(), history.occurredAt());
+                history.type(), history.delta(), history.executorEmpNo(), history.executorName(), history.occurredAt());
     }
 }

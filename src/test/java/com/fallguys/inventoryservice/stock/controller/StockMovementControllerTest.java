@@ -149,6 +149,18 @@ class StockMovementControllerTest {
                 public StockMovement save(StockMovement movement) {
                     return movement;
                 }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
+                }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
+                }
             };
             return new StockMovementService(repository);
         }

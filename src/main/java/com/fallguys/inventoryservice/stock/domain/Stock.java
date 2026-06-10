@@ -92,4 +92,36 @@ public class Stock {
         this.quantity = next;
         return delta;
     }
+
+    /**
+     * 입고로 현재고를 늘리고 변동량(delta = 입고 수량)을 반환한다. 입고는 항상 증가라 음수 재고 우려가 없다.
+     *
+     * @throws IllegalArgumentException 입고 수량이 1 미만일 때
+     */
+    public int increase(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("입고 수량은 1 이상이어야 합니다: " + quantity);
+        }
+        this.quantity += quantity;
+        return quantity;
+    }
+
+    /**
+     * 출고로 현재고를 줄이고 변동량(delta = -출고 수량)을 반환한다. 가용재고(현재고)를 초과하면 거부한다(음수 재고 금지).
+     * 검증을 모두 통과한 뒤에만 수량이 바뀌므로 예외 발생 시 현재고는 보존된다.
+     *
+     * @throws IllegalArgumentException 출고 수량이 1 미만일 때
+     * @throws InsufficientStockException 출고 결과 현재고가 음수가 될 때
+     */
+    public int decrease(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("출고 수량은 1 이상이어야 합니다: " + quantity);
+        }
+        int next = this.quantity - quantity;
+        if (next < 0) {
+            throw new InsufficientStockException(sku, this.quantity, -quantity);
+        }
+        this.quantity = next;
+        return -quantity;
+    }
 }

@@ -20,6 +20,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
@@ -178,6 +179,21 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void findQuantitiesByWarehouseCodeAndSkus는_해당창고_존재SKU만_반환하고_없는SKU와_타창고는_제외한다() {
+        seedStocks();
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
+
+        List<StockQuantity> rows = adapter.findQuantitiesByWarehouseCodeAndSkus(
+                "WH-SE-001", List.of("HMC-EN-00214", "HMC-BR-00788", "NO-SUCH"));
+
+        assertThat(rows).extracting(StockQuantity::sku)
+                .containsExactlyInAnyOrder("HMC-EN-00214", "HMC-BR-00788"); // NO-SUCH 생략
+        StockQuantity en = rows.stream().filter(r -> r.sku().equals("HMC-EN-00214")).findFirst().orElseThrow();
+        assertThat(en.quantity()).isEqualTo(120);   // WH-SE-001 값(HQ-001의 500이 아님)
+        assertThat(en.safetyStock()).isEqualTo(50);
+    }
+
+    @Test
     void findSkuWarehouseStocks_전체창고는_sku의_모든_창고행을_창고코드순으로_반환한다() {
         seedStocks();
         insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
@@ -248,6 +264,26 @@ class StockRepositoryAdapterTest {
 
         assertThat(adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "NO-WH")).isEmpty();
         assertThat(adapter.findBySkuAndWarehouseCode("NO-SKU", "WH-SE-001")).isEmpty();
+    }
+
+    @Test
+    void findBySkuAndWarehouseIdForUpdate는_비관락으로_재고를_반환한다() {
+        seedStocks();
+
+        Stock stock = adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 2L).orElseThrow();
+
+        assertThat(stock.getId()).isNotNull();
+        assertThat(stock.getWarehouseId()).isEqualTo(2L);
+        assertThat(stock.getQuantity()).isEqualTo(120);
+        assertThat(stock.getSafetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findBySkuAndWarehouseIdForUpdate는_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 999L)).isEmpty();
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("NO-SKU", 2L)).isEmpty();
     }
 
     @Test
