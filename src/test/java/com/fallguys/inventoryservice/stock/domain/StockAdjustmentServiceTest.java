@@ -166,6 +166,12 @@ class StockAdjustmentServiceTest {
         }
 
         @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
+        }
+
+        @Override
         public MovementSummaryPage search(MovementSearchQuery query) {
             return null;
         }

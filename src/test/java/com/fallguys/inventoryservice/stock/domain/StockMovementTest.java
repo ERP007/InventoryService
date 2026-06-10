@@ -123,6 +123,32 @@ class StockMovementTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- createInbound (입고) ---
+
+    @Test
+    void createInbound는_type_INBOUND_reason_null로_원천문서와_함께_생성된다() {
+        StockMovement m = StockMovement.createInbound(
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 30, "PO-2026-0012", 1, 130, "HMC1001", "김본사");
+
+        assertThat(m.getId()).isNull();
+        assertThat(m.getType()).isEqualTo(MovementType.INBOUND);
+        assertThat(m.getReason()).isNull();
+        assertThat(m.getNote()).isNull();
+        assertThat(m.getDelta()).isEqualTo(30);
+        assertThat(m.getStockAfter()).isEqualTo(130);
+        assertThat(m.getSourceRef()).isEqualTo("PO-2026-0012");
+        assertThat(m.getSourceLineNo()).isEqualTo(1);
+        assertThat(m.getExecutorEmpNo()).isEqualTo("HMC1001");
+        assertThat(m.getExecutorName()).isEqualTo("김본사");
+    }
+
+    @Test
+    void createInbound_delta가_0이하면_예외() {
+        assertThatThrownBy(() -> StockMovement.createInbound(
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 0, "PO-1", 1, 100, "HMC1001", "김본사"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     // --- of() 복원 + 생성자 불변식 ---
 
     @Test

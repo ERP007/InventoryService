@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
-import com.fallguys.inventoryservice.stock.domain.ItemCategoryProvider;
+import com.fallguys.inventoryservice.stock.domain.ItemInfoProvider;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
@@ -421,12 +421,12 @@ class StockControllerTest {
         @Bean
         StockSkuDetailService stockSkuDetailService(StockRepository stockRepository,
                                                     StockMovementRepository stockMovementRepository,
-                                                    ItemCategoryProvider itemCategoryProvider) {
-            return new StockSkuDetailService(stockRepository, stockMovementRepository, itemCategoryProvider);
+                                                    ItemInfoProvider itemInfoProvider) {
+            return new StockSkuDetailService(stockRepository, stockMovementRepository, itemInfoProvider);
         }
 
         @Bean
-        ItemCategoryProvider itemCategoryProvider() {
+        ItemInfoProvider itemInfoProvider() {
             return sku -> Optional.empty();
         }
 
@@ -528,6 +528,12 @@ class StockControllerTest {
                 @Override
                 public long countRecent(List<String> warehouseCodes, Instant since) {
                     return 8;
+                }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
                 }
 
                 @Override

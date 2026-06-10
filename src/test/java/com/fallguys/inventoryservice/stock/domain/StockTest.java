@@ -130,4 +130,23 @@ class StockTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(stock.getQuantity()).isEqualTo(50);
     }
+
+    @Test
+    void increase는_현재고를_늘리고_입고수량을_delta로_반환한다() {
+        Stock stock = Stock.of(1001L, "SKU-1", "부품", ItemUnit.EA, 1L, 50, 40);
+
+        int delta = stock.increase(30);
+
+        assertThat(delta).isEqualTo(30);
+        assertThat(stock.getQuantity()).isEqualTo(80);
+    }
+
+    @Test
+    void increase_수량이_0이하면_IllegalArgumentException이고_현재고는_불변이다() {
+        Stock stock = Stock.of(1001L, "SKU-1", "부품", ItemUnit.EA, 1L, 50, 40);
+
+        assertThatThrownBy(() -> stock.increase(0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(stock.getQuantity()).isEqualTo(50);
+    }
 }

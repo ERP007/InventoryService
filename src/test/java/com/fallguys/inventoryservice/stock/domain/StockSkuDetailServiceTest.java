@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
-import com.fallguys.inventoryservice.stock.domain.query.ItemCategory;
+import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
@@ -79,7 +79,7 @@ class StockSkuDetailServiceTest {
         stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
         StockSkuDetailService service = new StockSkuDetailService(
                 stockRepo, new StubMovementRepository(),
-                sku -> Optional.of(new ItemCategory("엔진", "오일필터")));
+                sku -> Optional.of(new ItemInfo("엔진오일 필터", ItemUnit.EA, "엔진", "오일필터", 50)));
 
         StockSkuDetail detail = service.getSkuDetail("HMC-EN-00214", TenancyType.ADMIN, null);
 
@@ -191,6 +191,12 @@ class StockSkuDetailServiceTest {
         @Override
         public StockMovement save(StockMovement movement) {
             return movement;
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
         }
     }
 }
