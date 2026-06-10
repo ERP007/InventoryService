@@ -92,4 +92,17 @@ public class Stock {
         this.quantity = next;
         return delta;
     }
+
+    /**
+     * 입고로 현재고를 늘리고 변동량(delta = 입고 수량)을 반환한다. 입고는 항상 증가라 음수 재고 우려가 없다.
+     *
+     * @throws IllegalArgumentException 입고 수량이 1 미만일 때
+     */
+    public int increase(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("입고 수량은 1 이상이어야 합니다: " + quantity);
+        }
+        this.quantity += quantity;
+        return quantity;
+    }
 }

@@ -102,6 +102,22 @@ public class StockMovement {
                 stockAfter, note, executorEmpNo, executorName, null);
     }
 
+    /**
+     * PO 입고·SO 도착으로 신규 입고 이동 이력을 생성한다. type=INBOUND, reason 없음(정상 흐름), note 없음.
+     * delta는 입고 수량(양수)이고 sourceRef·sourceLineNo는 원천 문서 라인이다. id·performedAt은 영속 시 채워진다.
+     *
+     * @throws IllegalArgumentException delta가 양수가 아닐 때
+     */
+    public static StockMovement createInbound(String sku, String itemName, ItemUnit itemUnit, Long warehouseId,
+                                              int delta, String sourceRef, Integer sourceLineNo, int stockAfter,
+                                              String executorEmpNo, String executorName) {
+        if (delta <= 0) {
+            throw new IllegalArgumentException("입고 변동량(delta)은 양수여야 합니다: " + delta);
+        }
+        return new StockMovement(null, sku, itemName, itemUnit, warehouseId, delta, MovementType.INBOUND, null,
+                sourceRef, sourceLineNo, stockAfter, null, executorEmpNo, executorName, null);
+    }
+
     /** 영속 엔티티에서 도메인 모델을 복원한다(조회). */
     public static StockMovement of(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId,
                                    int delta, MovementType type, MovementReason reason, String sourceRef,

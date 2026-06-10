@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
-import com.fallguys.inventoryservice.stock.domain.query.ItemCategory;
+import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
@@ -25,7 +25,7 @@ public class StockSkuDetailService {
 
     private final StockRepository stockRepository;
     private final StockMovementRepository stockMovementRepository;
-    private final ItemCategoryProvider itemCategoryProvider;
+    private final ItemInfoProvider itemInfoProvider;
 
     /**
      * sku 상세 패널을 조회한다. Tenancy에 따라 집계 범위가 다르다(BRANCH는 자기 창고 1곳).
@@ -52,11 +52,11 @@ public class StockSkuDetailService {
         int totalQuantity = rows.stream().mapToInt(StockSkuRow::quantity).sum();
         int totalSafetyStock = rows.stream().mapToInt(StockSkuRow::safetyStock).sum();
         List<MovementHistory> history = stockMovementRepository.findRecentBySku(sku, scope, RECENT_HISTORY_LIMIT);
-        ItemCategory category = fetchCategoryOrNull(sku);
+        ItemInfo itemInfo = fetchItemInfoOrNull(sku);
         return new StockSkuDetail(
                 sku, rows.get(0).itemName(), rows.get(0).itemUnit(),
-                category == null ? null : category.majorCategory(), // GET internal/items/{sku} 구현 완료 & 정상 호출 시 값 매핑
-                category == null ? null : category.middleCategory(),
+                itemInfo == null ? null : itemInfo.majorCategory(), // GET internal/items/{sku} 구현 완료 & 정상 호출 시 값 매핑
+                itemInfo == null ? null : itemInfo.middleCategory(),
                 totalQuantity, totalSafetyStock, rows, history);
     }
 
@@ -64,11 +64,11 @@ public class StockSkuDetailService {
      * 대분류·중분류를 Item 서비스에서 조회한다(트랜잭션 밖). 통합 비활성·부품 없음이면 null,
      * 기술적 호출 실패면 WARN 로그 후 null로 강등한다 — 카테고리는 패널의 부가 정보라 실패해도 패널은 정상 반환한다.
      */
-    private ItemCategory fetchCategoryOrNull(String sku) {
+    private ItemInfo fetchItemInfoOrNull(String sku) {
         try {
-            return itemCategoryProvider.findCategoryBySku(sku).orElse(null);
+            return itemInfoProvider.findBySku(sku).orElse(null);
         } catch (ItemServiceUnavailableException e) {
-            log.warn("Item 카테고리 조회 실패 — 대분류·중분류를 null로 강등합니다. sku={}", sku);
+            log.warn("Item 정보 조회 실패 — 대분류·중분류를 null로 강등합니다. sku={}", sku);
             return null;
         }
     }

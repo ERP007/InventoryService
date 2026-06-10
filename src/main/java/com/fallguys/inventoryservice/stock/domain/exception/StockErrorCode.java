@@ -11,7 +11,8 @@ public enum StockErrorCode {
     STOCK_NOT_FOUND("STOCK_NOT_FOUND", "재고를 찾을 수 없습니다."),
     STOCK_ALREADY_EXISTS("STOCK_ALREADY_EXISTS", "이미 존재하는 재고입니다. 재고 조정을 사용하세요."),
     NO_STOCK_CHANGE("NO_STOCK_CHANGE", "변동이 없어 조정할 수 없습니다."),
-    INSUFFICIENT_STOCK("INSUFFICIENT_STOCK", "가용 재고를 초과해 차감할 수 없습니다.");
+    INSUFFICIENT_STOCK("INSUFFICIENT_STOCK", "가용 재고를 초과해 차감할 수 없습니다."),
+    ITEM_NOT_FOUND("ITEM_NOT_FOUND", "Item 마스터에서 부품을 찾을 수 없습니다.");
 
     private final String code;
     private final String defaultMessage;
