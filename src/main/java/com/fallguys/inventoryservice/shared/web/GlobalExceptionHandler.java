@@ -28,6 +28,7 @@ import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.shared.exception.CommonErrorCode;
 import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.exception.ResourceNotFoundException;
+import com.fallguys.inventoryservice.shared.exception.ServiceUnavailableException;
 
 /**
  * 모든 예외의 HTTP 변환을 전담한다. 예외 로깅도 이 곳에서만 수행한다(중복 금지).
@@ -51,6 +52,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleConflict(ConflictException ex) {
         log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
+    }
+
+    /** 외부 서비스 호출 실패(§10): 503. 원인은 로그로만 보존하고 클라이언트엔 일반 메시지를 준다. 시스템성 실패라 ERROR. */
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ProblemDetail handleServiceUnavailable(ServiceUnavailableException ex) {
+        log.error("External service unavailable [{}]: {}", ex.getCode(), ex.getMessage(), ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getCode(),
+                "외부 서비스 호출에 실패했습니다. 잠시 후 다시 시도하세요.");
     }
 
     /** 동시 수정으로 인한 낙관락 충돌(JPA @Version): 409. 최신 재조회 후 재시도를 유도한다. 비즈니스성 충돌이라 WARN. */
