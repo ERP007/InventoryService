@@ -38,26 +38,46 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
-@WebMvcTest(StockInternalController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, StockInternalControllerTest.StubConfig.class})
-class StockInternalControllerTest {
+@WebMvcTest(StockQuantityController.class)
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, StockQuantityControllerTest.StubConfig.class})
+class StockQuantityControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    /** 내부 호출은 Role 게이팅이 없으므로 어떤 role이든 인증만 되면 된다. */
-    private static RequestPostProcessor jwtWithRole(String role) {
+    private static RequestPostProcessor branchJwt(String tenancyCode) {
         return jwt().jwt(token -> token
-                .claim("employee_no", "svc-001")
-                .claim("user_role", role));
+                .claim("employee_no", "svc")
+                .claim("user_role", "BRANCH_STAFF")
+                .claim("tenancy_type", "BRANCH")
+                .claim("tenancy_code", tenancyCode));
+    }
+
+    private static RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                .claim("employee_no", "svc")
+                .claim("user_role", "ADMIN")
+                .claim("tenancy_type", "ADMIN"));
     }
 
     @Test
-    void 창고와_SKU목록으로_현재고_안전재고를_반환하고_없는_SKU는_생략한다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
+    void BRANCH는_요청창고를_무시하고_자기창고로_조회한다() throws Exception {
+        // 요청은 HQ-001이지만 BRANCH는 자기 창고(WH-SE-001)로 강제된다.
+        mockMvc.perform(get("/inventory/stocks/quantities")
+                        .param("warehouseCode", "HQ-001")
+                        .param("skus", "HMC-EN-00214,HMC-BR-00788")
+                        .with(branchJwt("WH-SE-001")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warehouseCode").value("WH-SE-001")) // 강제됨
+                .andExpect(jsonPath("$.stocks.length()").value(2));
+    }
+
+    @Test
+    void ADMIN은_요청창고를_그대로_조회하고_없는_SKU는_생략한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("warehouseCode", "WH-SE-001")
                         .param("skus", "HMC-EN-00214,HMC-BR-00788,NO-SUCH")
-                        .with(jwtWithRole("ADMIN")))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.warehouseCode").value("WH-SE-001"))
                 .andExpect(jsonPath("$.stocks.length()").value(2)) // NO-SUCH 생략
@@ -68,30 +88,19 @@ class StockInternalControllerTest {
 
     @Test
     void 반복파라미터_skus_A_B형태도_콤마처럼_처리된다() throws Exception {
-        // ?skus=HMC-EN-00214&skus=HMC-BR-00788 (반복 파라미터) — Spring이 콤마 문자열로 합치는지 검증
-        mockMvc.perform(get("/internal/inventory/stocks")
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("warehouseCode", "WH-SE-001")
                         .param("skus", "HMC-EN-00214", "HMC-BR-00788")
-                        .with(jwtWithRole("ADMIN")))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stocks.length()").value(2));
     }
 
     @Test
-    void Role_게이팅이_없어_BRANCH_STAFF로도_조회된다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
-                        .param("warehouseCode", "WH-SE-001")
+    void ADMIN이_warehouseCode를_안주면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("skus", "HMC-EN-00214")
-                        .with(jwtWithRole("BRANCH_STAFF")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.warehouseCode").value("WH-SE-001"));
-    }
-
-    @Test
-    void warehouseCode_누락은_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
-                        .param("skus", "HMC-EN-00214")
-                        .with(jwtWithRole("ADMIN")))
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.details[0].field").value("warehouseCode"));
@@ -99,9 +108,9 @@ class StockInternalControllerTest {
 
     @Test
     void skus_누락은_400과_INVALID_PARAMETER를_반환한다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("warehouseCode", "WH-SE-001")
-                        .with(jwtWithRole("ADMIN")))
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
                 .andExpect(jsonPath("$.details[0].field").value("skus"));
@@ -109,17 +118,17 @@ class StockInternalControllerTest {
 
     @Test
     void 없는_창고는_404와_WAREHOUSE_NOT_FOUND를_반환한다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("warehouseCode", "NOPE-999")
                         .param("skus", "HMC-EN-00214")
-                        .with(jwtWithRole("ADMIN")))
+                        .with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_NOT_FOUND"));
     }
 
     @Test
     void 인증토큰이_없으면_401을_반환한다() throws Exception {
-        mockMvc.perform(get("/internal/inventory/stocks")
+        mockMvc.perform(get("/inventory/stocks/quantities")
                         .param("warehouseCode", "WH-SE-001")
                         .param("skus", "HMC-EN-00214"))
                 .andExpect(status().isUnauthorized());
@@ -141,7 +150,6 @@ class StockInternalControllerTest {
                             .toList();
                 }
 
-                // 이 컨트롤러가 사용하지 않는 메서드들 — 최소 구현.
                 @Override
                 public StockSummaryPage search(StockSearchQuery query) {
                     return null;
