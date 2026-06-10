@@ -16,4 +16,12 @@ import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
 public interface ItemInfoProvider {
 
     Optional<ItemInfo> findBySku(String sku);
+
+    /**
+     * Item 통합이 활성인지 여부. 비활성(Item 미배포)이면 {@link #findBySku}는 호출 없이 {@code empty}를 반환하므로,
+     * 호출 측이 "비활성이라 검증 불가"와 "활성인데 부품 없음(404 대상)"을 구분해야 할 때 이 값으로 분기한다. 기본값 true.
+     */
+    default boolean isEnabled() {
+        return true;
+    }
 }

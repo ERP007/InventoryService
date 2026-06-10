@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
@@ -29,6 +30,8 @@ public class StockService {
     private final StockRepository stockRepository;
     // 같은 inventory 서비스 내 warehouse 애그리거트 참조(코드→id 해석, 존재 검증)
     private final WarehouseRepository warehouseRepository;
+    // [DIP] Item 마스터 조회(sku 존재 검증·빈 stock의 기본 안전재고). 통합 비활성이면 검증을 건너뛴다.
+    private final ItemInfoProvider itemInfoProvider;
 
     /**
      * 재고 목록을 조회한다. Tenancy에 따라 조회 범위가 다르다.
@@ -72,25 +75,37 @@ public class StockService {
      * SO 발주 라인 추가 시 (창고 × 부품)의 현재고·안전재고를 조회한다. BRANCH 사용자 전용(인가는 컨트롤러).
      *
      * 흐름:
-     * 1) 호출자의 담당 창고(tenancy_code)와 요청 warehouseCode를 동등 비교한다(외부 호출 없음).
-     *    다르면 타 창고 존재를 은닉하기 위해 404(StockNotFoundException).
-     * 2) (warehouseCode × sku) 재고 행을 조회한다. 있으면 그 값을, 없으면 quantity=0·safetyStock=0으로 응답한다(빈 stock).
+     * 1) 호출자의 담당 창고(tenancy_code)와 요청 warehouseCode를 동등 비교한다. 다르면 타 창고 존재 은닉을 위해 404.
+     * 2) (warehouseCode × sku) 재고 행을 조회한다. 있으면 그대로 반환한다(이미 적재된 sku라 Item 검증 불필요·외부 호출 없음).
+     * 3) 재고 행이 없으면 Item 마스터로 sku 유효성을 확인한다(외부 호출):
+     *    - 통합 비활성(Item 미배포)이면 검증을 건너뛰고 quantity=0·safetyStock=0으로 graceful 응답(프리필 유지).
+     *    - 활성이고 마스터에 sku가 있으면 quantity=0 + 마스터 기본 안전재고로 응답(빈 stock).
+     *    - 활성인데 마스터에 sku가 없으면 404(존재하지 않는 부품).
      *
-     * 트랜잭션: 읽기 전용. 외부 호출 없음.
+     * 트랜잭션: 읽기 전용. 재고 행이 없을 때만 Item 외부 호출이 일어난다(있으면 호출 없음).
      *
      * 예외:
      * - 담당 창고 불일치(존재 은닉): StockNotFoundException (404)
-     *
-     * TODO(Item 연동): sku가 Item 마스터에 없으면 404(STOCK_NOT_FOUND),
-     *  빈 stock의 safetyStock은 Item 마스터 기본값으로 fallback. 현재는 검증 생략 + 0으로 응답.
+     * - 통합 활성 + Item 마스터에 없는 sku: StockNotFoundException (404)
+     * - 통합 활성 + Item 호출 기술 실패(타임아웃·연결·5xx): ItemServiceUnavailableException (503)
      */
     @Transactional(readOnly = true)
     public StockDetail getDetail(String warehouseCode, String sku, String tenancyCode) {
         if (!Objects.equals(tenancyCode, warehouseCode)) {
             throw new StockNotFoundException(warehouseCode, sku);
         }
-        return stockRepository.findDetailByWarehouseCodeAndSku(warehouseCode, sku)
-                .orElseGet(() -> new StockDetail(warehouseCode, sku, 0, 0));
+        Optional<StockDetail> existing = stockRepository.findDetailByWarehouseCodeAndSku(warehouseCode, sku);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        if (!itemInfoProvider.isEnabled()) {
+            // Item 미배포(통합 비활성) 동안엔 마스터 검증이 불가하므로 SO 발주 프리필이 깨지지 않게 빈 stock(0/0)으로 응답한다.
+            return new StockDetail(warehouseCode, sku, 0, 0);
+        }
+        // 재고 행이 없으면 Item 마스터에 실재하는 sku인지 확인하고, 빈 stock의 안전재고는 마스터 기본값을 쓴다.
+        return itemInfoProvider.findBySku(sku)
+                .map(info -> new StockDetail(warehouseCode, sku, 0, info.safetyStock()))
+                .orElseThrow(() -> new StockNotFoundException(warehouseCode, sku));
     }
 
     /**

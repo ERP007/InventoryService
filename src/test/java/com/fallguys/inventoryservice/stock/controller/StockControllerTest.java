@@ -139,11 +139,11 @@ class StockControllerTest {
     }
 
     @Test
-    void 재고행이_없으면_200과_quantity0_safetyStock0을_반환한다() throws Exception {
+    void 재고행없고_Item마스터에도_없으면_404와_STOCK_NOT_FOUND를_반환한다() throws Exception {
+        // 재고 행이 없고 통합 활성(StubConfig itemInfoProvider) + 마스터에 없는 sku → 404.
         mockMvc.perform(get("/inventory/stocks/WH-SE-001/UNREGISTERED").with(roleJwt(UserRole.BRANCH_STAFF)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.quantity").value(0))
-                .andExpect(jsonPath("$.safetyStock").value(0));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
     }
 
     @Test
@@ -414,8 +414,9 @@ class StockControllerTest {
     static class StubConfig {
 
         @Bean
-        StockService stockService(StockRepository stockRepository, WarehouseRepository warehouseRepository) {
-            return new StockService(stockRepository, warehouseRepository);
+        StockService stockService(StockRepository stockRepository, WarehouseRepository warehouseRepository,
+                                  ItemInfoProvider itemInfoProvider) {
+            return new StockService(stockRepository, warehouseRepository, itemInfoProvider);
         }
 
         @Bean

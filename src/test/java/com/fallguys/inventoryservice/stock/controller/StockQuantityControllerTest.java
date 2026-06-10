@@ -238,7 +238,8 @@ class StockQuantityControllerTest {
                 }
             };
 
-            return new StockService(stockRepository, warehouseRepository);
+            // quantities는 getDetail을 거치지 않아 Item 호출이 없다 — no-op provider로 충분.
+            return new StockService(stockRepository, warehouseRepository, sku -> Optional.empty());
         }
     }
 }
