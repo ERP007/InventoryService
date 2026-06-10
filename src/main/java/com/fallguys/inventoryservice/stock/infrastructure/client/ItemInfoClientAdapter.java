@@ -53,6 +53,11 @@ public class ItemInfoClientAdapter implements ItemInfoProvider {
     }
 
     @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    @Override
     public Optional<ItemInfo> findBySku(String sku) {
         if (!enabled) {
             return Optional.empty();
