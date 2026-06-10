@@ -1,8 +1,11 @@
 package com.fallguys.inventoryservice.stock.infrastructure.client;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -32,11 +35,21 @@ public class ItemInfoClientAdapter implements ItemInfoProvider {
 
     public ItemInfoClientAdapter(
             @Value("${item.integration.enabled:false}") boolean enabled,
-            @Value("${item.base-url:}") String baseUrl) {
+            @Value("${item.base-url:}") String baseUrl,
+            @Value("${item.connect-timeout-ms:2000}") long connectTimeoutMs,
+            @Value("${item.read-timeout-ms:3000}") long readTimeoutMs) {
         this.enabled = enabled;
         this.baseUrl = baseUrl;
-        // Spring Boot 자동구성 빈(RestClient.Builder)에 의존하지 않고 기본 클라이언트를 직접 생성한다(컨텍스트 결정성).
-        this.restClient = RestClient.create();
+        // Item 호출에 connect/read 타임아웃을 명시한다. 없으면(RestClient.create() 기본) Item 지연 시 호출 스레드가 무한 블로킹된다.
+        // 신규행 생성은 이 호출이 inbound 쓰기 트랜잭션 안에서 일어나 워커 스레드와 DB 커넥션이 함께 묶이므로, 풀 고갈로 번질 수 있다.
+        // 타임아웃 초과는 RestClientException으로 떠서 아래 catch → ItemServiceUnavailableException(503)으로 번역된다(§10).
+        // 자동구성(RestClient.Builder)에 의존하지 않고 JDK 클라이언트를 직접 구성한다(컨텍스트 결정성).
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
     }
 
     @Override

@@ -33,7 +33,10 @@ springdoc:
 
 # Item 서비스 연동(상세 패널 대분류·중분류). enabled=false면 호출하지 않고 카테고리는 null로 강등한다(Item 미배포 동안 기본값).
 # 배포 후 ITEM_INTEGRATION_ENABLED=true + ITEM_BASE_URL 설정으로 전환한다.
+# connect/read 타임아웃(ms): Item 지연 시 호출 스레드 무한 블로킹 방지. 초과 시 503(ITEM_SERVICE_UNAVAILABLE)으로 번역된다.
 item:
   integration:
     enabled: ${ITEM_INTEGRATION_ENABLED:false}
   base-url: ${ITEM_BASE_URL:}
+  connect-timeout-ms: ${ITEM_CONNECT_TIMEOUT_MS:2000}
+  read-timeout-ms: ${ITEM_READ_TIMEOUT_MS:3000}
