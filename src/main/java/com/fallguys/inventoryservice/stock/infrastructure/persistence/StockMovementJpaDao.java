@@ -13,6 +13,7 @@ import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, Long> {
 
@@ -106,5 +107,21 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             ORDER BY m.id
             """)
     List<InboundMovement> findInboundBySourceRefAndWarehouseCode(
+            @Param("sourceRef") String sourceRef, @Param("warehouseCode") String warehouseCode);
+
+    /**
+     * (sourceRef × 창고)의 OUTBOUND 이동 이력을 결과 투영(OutboundMovement)으로 조회한다(출고 멱등 replay).
+     * 조인: WarehouseEntity를 (m.warehouseId = w.id)로 조인해 창고 코드로 한정한다. id 오름차순(적재 순서)으로 반환한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.OutboundMovement(
+                m.id, m.sku, m.delta, m.stockAfter)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE m.sourceRef = :sourceRef AND w.code = :warehouseCode
+              AND m.type = com.fallguys.inventoryservice.stock.domain.MovementType.OUTBOUND
+            ORDER BY m.id
+            """)
+    List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
             @Param("sourceRef") String sourceRef, @Param("warehouseCode") String warehouseCode);
 }

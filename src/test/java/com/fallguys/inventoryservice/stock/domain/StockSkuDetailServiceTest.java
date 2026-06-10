@@ -164,6 +164,11 @@ class StockSkuDetailServiceTest {
         public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
             return Optional.empty();
         }
+
+        @Override
+        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+            return Optional.empty();
+        }
     }
 
     private static final class StubMovementRepository implements StockMovementRepository {
@@ -195,6 +200,12 @@ class StockSkuDetailServiceTest {
 
         @Override
         public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
                 String sourceRef, String warehouseCode) {
             return List.of();
         }

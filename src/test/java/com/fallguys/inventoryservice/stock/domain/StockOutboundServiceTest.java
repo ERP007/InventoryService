@@ -12,15 +12,16 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import com.fallguys.inventoryservice.stock.domain.command.InboundCommand;
-import com.fallguys.inventoryservice.stock.domain.command.InboundLine;
-import com.fallguys.inventoryservice.stock.domain.exception.ItemNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.command.OutboundCommand;
+import com.fallguys.inventoryservice.stock.domain.command.OutboundLine;
+import com.fallguys.inventoryservice.stock.domain.exception.InsufficientStockException;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
-import com.fallguys.inventoryservice.stock.domain.query.InboundResult;
-import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -40,106 +41,102 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
-class StockInboundServiceTest {
+class StockOutboundServiceTest {
 
-    private static InboundCommand command(List<InboundLine> lines) {
-        return new InboundCommand("PO-2026-0012", "WH-SE-001", lines, "HMC1001", "김본사");
+    private static OutboundCommand command(List<OutboundLine> lines) {
+        return new OutboundCommand("SO-2026-0034", "WH-SE-002", lines, "HMC1001", "김본사");
     }
 
     @Test
-    void 정상_다중라인을_증가시키고_INBOUND이력을_라인수만큼_남긴다() {
+    void 정상_다중라인을_차감하고_OUTBOUND이력을_라인수만큼_남긴다() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.put(Stock.of(11L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
         stockRepo.put(Stock.of(12L, "HMC-BR-00788", "브레이크 패드", ItemUnit.SET, 2L, 40, 40));
         StubMovementRepository movementRepo = new StubMovementRepository();
-        StockInboundService service = new StockInboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true), sku -> Optional.empty());
+        StockOutboundService service = new StockOutboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true));
 
-        InboundResult result = service.inbound(command(List.of(
-                new InboundLine("HMC-EN-00214", 30, 1),
-                new InboundLine("HMC-BR-00788", 10, 2))));
+        OutboundResult result = service.outbound(command(List.of(
+                new OutboundLine("HMC-EN-00214", 30, 1),
+                new OutboundLine("HMC-BR-00788", 10, 2))));
 
         assertThat(result.movements()).hasSize(2);
-        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(130);
-        assertThat(stockRepo.get("HMC-BR-00788").getQuantity()).isEqualTo(50);
+        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(70);
+        assertThat(stockRepo.get("HMC-BR-00788").getQuantity()).isEqualTo(30);
 
         StockMovement m1 = movementRepo.saved.get(0);
-        assertThat(m1.getType()).isEqualTo(MovementType.INBOUND);
+        assertThat(m1.getType()).isEqualTo(MovementType.OUTBOUND);
         assertThat(m1.getReason()).isNull();
-        assertThat(m1.getDelta()).isEqualTo(30);
-        assertThat(m1.getStockAfter()).isEqualTo(130);
+        assertThat(m1.getDelta()).isEqualTo(-30);
+        assertThat(m1.getStockAfter()).isEqualTo(70);
         assertThat(m1.getExecutorEmpNo()).isEqualTo("HMC1001");
         assertThat(m1.getExecutorName()).isEqualTo("김본사");
-        assertThat(m1.getSourceRef()).isEqualTo("PO-2026-0012");
+        assertThat(m1.getSourceRef()).isEqualTo("SO-2026-0034");
         assertThat(m1.getSourceLineNo()).isEqualTo(1);
 
-        InboundMovement r1 = result.movements().get(0);
+        OutboundMovement r1 = result.movements().get(0);
         assertThat(r1.sku()).isEqualTo("HMC-EN-00214");
-        assertThat(r1.delta()).isEqualTo(30);
-        assertThat(r1.currentQuantity()).isEqualTo(130);
+        assertThat(r1.delta()).isEqualTo(-30);
+        assertThat(r1.currentQuantity()).isEqualTo(70);
+        // 출고는 비관락 finder로만 재고를 읽는다(비잠금 finder 미사용).
+        assertThat(stockRepo.forUpdateCalls).isEqualTo(2);
+        assertThat(stockRepo.nonLockingCalls).isZero();
     }
 
     @Test
-    void 멱등_같은sourceRef로_이미_처리됐으면_replay하고_재증가하지_않는다() {
+    void 멱등_같은sourceRef로_이미_처리됐으면_replay하고_재차감하지_않는다() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.put(Stock.of(11L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
         StubMovementRepository movementRepo = new StubMovementRepository();
-        movementRepo.alreadyProcessed = List.of(new InboundMovement(88240L, "HMC-EN-00214", 30, 130));
-        StockInboundService service = new StockInboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true), sku -> Optional.empty());
+        movementRepo.alreadyProcessed = List.of(new OutboundMovement(88250L, "HMC-EN-00214", -20, 80));
+        StockOutboundService service = new StockOutboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true));
 
-        InboundResult result = service.inbound(command(List.of(new InboundLine("HMC-EN-00214", 30, 1))));
+        OutboundResult result = service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1))));
 
-        assertThat(result.movements()).extracting(InboundMovement::movementId).containsExactly(88240L);
-        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(100); // 재증가 안 됨
+        assertThat(result.movements()).extracting(OutboundMovement::movementId).containsExactly(88250L);
+        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(100); // 재차감 안 됨
         assertThat(movementRepo.saved).isEmpty();                                // 신규 저장 안 됨
+        assertThat(stockRepo.forUpdateCalls).isZero();                           // 재고 조회·잠금조차 안 함
     }
 
     @Test
     void 창고가_없으면_WarehouseNotFoundException() {
-        StockInboundService service = new StockInboundService(
-                new StubStockRepository(), new StubMovementRepository(), new StubWarehouseRepository(null, true),
-                sku -> Optional.empty());
+        StockOutboundService service = new StockOutboundService(
+                new StubStockRepository(), new StubMovementRepository(), new StubWarehouseRepository(null, true));
 
-        assertThatThrownBy(() -> service.inbound(command(List.of(new InboundLine("HMC-EN-00214", 30, 1)))))
+        assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
     @Test
     void 비활성_창고면_WarehouseInactiveException() {
-        StockInboundService service = new StockInboundService(
-                new StubStockRepository(), new StubMovementRepository(), new StubWarehouseRepository(2L, false),
-                sku -> Optional.empty());
+        StockOutboundService service = new StockOutboundService(
+                new StubStockRepository(), new StubMovementRepository(), new StubWarehouseRepository(2L, false));
 
-        assertThatThrownBy(() -> service.inbound(command(List.of(new InboundLine("HMC-EN-00214", 30, 1)))))
+        assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
                 .isInstanceOf(WarehouseInactiveException.class);
     }
 
     @Test
-    void 재고행이_없으면_Item정보로_신규행을_생성하고_증가시킨다() {
-        StubStockRepository stockRepo = new StubStockRepository(); // 재고 없음 → 신규 생성
+    void 재고행이_없으면_StockNotFoundException_이고_신규생성하지_않는다() {
+        StubStockRepository stockRepo = new StubStockRepository(); // 재고 없음 → 신규 생성하지 않고 404
         StubMovementRepository movementRepo = new StubMovementRepository();
-        ItemInfoProvider itemInfo = sku -> Optional.of(new ItemInfo("엔진오일 필터", ItemUnit.EA, "엔진", "오일필터", 60));
-        StockInboundService service = new StockInboundService(
-                stockRepo, movementRepo, new StubWarehouseRepository(2L, true), itemInfo);
+        StockOutboundService service = new StockOutboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true));
 
-        InboundResult result = service.inbound(command(List.of(new InboundLine("HMC-EN-00214", 30, 1))));
-
-        assertThat(result.movements()).extracting(InboundMovement::currentQuantity).containsExactly(30); // 0→30
-        Stock created = stockRepo.lastSaved;
-        assertThat(created.getItemName()).isEqualTo("엔진오일 필터");
-        assertThat(created.getItemUnit()).isEqualTo(ItemUnit.EA);
-        assertThat(created.getSafetyStock()).isEqualTo(60);   // Item 기본 안전재고
-        assertThat(created.getQuantity()).isEqualTo(30);
+        assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
+                .isInstanceOf(StockNotFoundException.class);
+        assertThat(movementRepo.saved).isEmpty();
     }
 
     @Test
-    void 재고행도_Item정보도_없으면_ItemNotFoundException() {
+    void 가용재고_부족이면_InsufficientStockException_이고_차감되지_않는다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.put(Stock.of(11L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 10, 50));
         StubMovementRepository movementRepo = new StubMovementRepository();
-        ItemInfoProvider itemInfo = sku -> Optional.empty(); // Item에도 없음(또는 통합 비활성)
-        StockInboundService service = new StockInboundService(
-                new StubStockRepository(), movementRepo, new StubWarehouseRepository(2L, true), itemInfo);
+        StockOutboundService service = new StockOutboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true));
 
-        assertThatThrownBy(() -> service.inbound(command(List.of(new InboundLine("NO-SUCH", 30, 1)))))
-                .isInstanceOf(ItemNotFoundException.class);
+        assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
+                .isInstanceOf(InsufficientStockException.class);
+        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(10); // 도메인이 검증 실패 시 현재고 보존
         assertThat(movementRepo.saved).isEmpty();
     }
 
@@ -147,7 +144,8 @@ class StockInboundServiceTest {
 
     private static final class StubStockRepository implements StockRepository {
         private final Map<String, Stock> stocks = new HashMap<>();
-        private Stock lastSaved;
+        private int forUpdateCalls;
+        private int nonLockingCalls;
 
         void put(Stock stock) {
             stocks.put(stock.getSku(), stock);
@@ -158,18 +156,19 @@ class StockInboundServiceTest {
         }
 
         @Override
-        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+            forUpdateCalls++;
             return Optional.ofNullable(stocks.get(sku));
         }
 
         @Override
-        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+        public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            nonLockingCalls++;
             return Optional.ofNullable(stocks.get(sku));
         }
 
         @Override
         public Long save(Stock stock) {
-            this.lastSaved = stock;
             return stock.getId();
         }
 
@@ -210,19 +209,13 @@ class StockInboundServiceTest {
     }
 
     private static final class StubMovementRepository implements StockMovementRepository {
-        private List<InboundMovement> alreadyProcessed = List.of();
+        private List<OutboundMovement> alreadyProcessed = List.of();
         private final List<StockMovement> saved = new ArrayList<>();
-        private long nextId = 88240L;
+        private long nextId = 88250L;
 
         @Override
-        public List<InboundMovement> findInboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
+        public List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
             return alreadyProcessed;
-        }
-
-        @Override
-        public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
-                String sourceRef, String warehouseCode) {
-            return List.of();
         }
 
         @Override
@@ -232,9 +225,14 @@ class StockInboundServiceTest {
                     movement.getWarehouseId(), movement.getDelta(), movement.getType(), movement.getReason(),
                     movement.getSourceRef(), movement.getSourceLineNo(), movement.getStockAfter(),
                     movement.getNote(), movement.getExecutorEmpNo(), movement.getExecutorName(),
-                    Instant.parse("2026-06-09T00:00:00Z"));
+                    Instant.parse("2026-06-10T00:00:00Z"));
             saved.add(persisted);
             return persisted;
+        }
+
+        @Override
+        public List<InboundMovement> findInboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
+            return List.of();
         }
 
         @Override

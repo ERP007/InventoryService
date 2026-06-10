@@ -7,6 +7,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -69,6 +70,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return build(HttpStatus.CONFLICT,
                 CommonErrorCode.OPTIMISTIC_LOCK_CONFLICT.getCode(),
                 CommonErrorCode.OPTIMISTIC_LOCK_CONFLICT.getDefaultMessage());
+    }
+
+    /**
+     * 비관락 획득 실패(잠금 대기 초과·경합): 409. 동시 출고 직렬화 중 잠금을 시간 내 얻지 못하면 발생하며 재시도를 유도한다.
+     * CannotAcquireLockException 등 하위 타입을 포함한다. 비즈니스성 충돌이라 WARN.
+     */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ProblemDetail handleLockTimeout(PessimisticLockingFailureException ex) {
+        log.warn("Pessimistic lock timeout [{}]", CommonErrorCode.LOCK_TIMEOUT.getCode());
+        return build(HttpStatus.CONFLICT,
+                CommonErrorCode.LOCK_TIMEOUT.getCode(),
+                CommonErrorCode.LOCK_TIMEOUT.getDefaultMessage());
     }
 
     /** 리소스 없음(존재 은닉 포함): 404. 비즈니스 예외이므로 WARN. BusinessException보다 구체적이라 이 핸들러가 우선한다. */

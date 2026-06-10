@@ -7,6 +7,7 @@ import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 /**
  * [DIP] 재고 이동 이력 영속성 추상화. 도메인이 정의하고 infrastructure가 구현한다.
@@ -29,4 +30,9 @@ public interface StockMovementRepository {
      * (sourceRef × 창고)로 이미 적재된 INBOUND 이동 이력을 조회한다(입고 멱등 replay용). 없으면 빈 리스트.
      */
     List<InboundMovement> findInboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode);
+
+    /**
+     * (sourceRef × 창고)로 이미 적재된 OUTBOUND 이동 이력을 조회한다(출고 멱등 replay용). 없으면 빈 리스트.
+     */
+    List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode);
 }

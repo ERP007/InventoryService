@@ -267,6 +267,26 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void findBySkuAndWarehouseIdForUpdate는_비관락으로_재고를_반환한다() {
+        seedStocks();
+
+        Stock stock = adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 2L).orElseThrow();
+
+        assertThat(stock.getId()).isNotNull();
+        assertThat(stock.getWarehouseId()).isEqualTo(2L);
+        assertThat(stock.getQuantity()).isEqualTo(120);
+        assertThat(stock.getSafetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findBySkuAndWarehouseIdForUpdate는_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 999L)).isEmpty();
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("NO-SKU", 2L)).isEmpty();
+    }
+
+    @Test
     void save_기존재고는_현재고를_갱신한다() {
         seedStocks();
         Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();

@@ -149,6 +149,35 @@ class StockMovementTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- createOutbound (출고) ---
+
+    @Test
+    void createOutbound는_type_OUTBOUND_reason_null로_음수delta와_원천문서와_함께_생성된다() {
+        StockMovement m = StockMovement.createOutbound(
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, -20, "SO-2026-0034", 1, 200, "HMC1001", "김본사");
+
+        assertThat(m.getId()).isNull();
+        assertThat(m.getType()).isEqualTo(MovementType.OUTBOUND);
+        assertThat(m.getReason()).isNull();
+        assertThat(m.getNote()).isNull();
+        assertThat(m.getDelta()).isEqualTo(-20);
+        assertThat(m.getStockAfter()).isEqualTo(200);
+        assertThat(m.getSourceRef()).isEqualTo("SO-2026-0034");
+        assertThat(m.getSourceLineNo()).isEqualTo(1);
+        assertThat(m.getExecutorEmpNo()).isEqualTo("HMC1001");
+        assertThat(m.getExecutorName()).isEqualTo("김본사");
+    }
+
+    @Test
+    void createOutbound_delta가_0이상이면_예외() {
+        assertThatThrownBy(() -> StockMovement.createOutbound(
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 0, "SO-1", 1, 100, "HMC1001", "김본사"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> StockMovement.createOutbound(
+                "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 5, "SO-1", 1, 100, "HMC1001", "김본사"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     // --- of() 복원 + 생성자 불변식 ---
 
     @Test

@@ -96,6 +96,11 @@ public class StockRepositoryAdapter implements StockRepository {
         return jpaDao.findBySkuAndWarehouseCode(sku, warehouseCode).map(StockEntity::toDomain);
     }
 
+    @Override
+    public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+        return jpaDao.findBySkuAndWarehouseIdForUpdate(sku, warehouseId).map(StockEntity::toDomain);
+    }
+
     /**
      * 도메인 정렬 조건을 JPQL ORDER BY 식으로 변환한다(기술 의존은 이 계층에 한정).
      * safetyRatio는 계산식이며 NULLIF로 안전재고 0의 0-나눗셈을 회피한다. 안정 정렬을 위해 id 오름차순을 tie-breaker로 덧붙인다.

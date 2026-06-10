@@ -189,6 +189,11 @@ class StockQuantityControllerTest {
                 public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
                     return Optional.empty();
                 }
+
+                @Override
+                public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+                    return Optional.empty();
+                }
             };
 
             WarehouseRepository warehouseRepository = new WarehouseRepository() {

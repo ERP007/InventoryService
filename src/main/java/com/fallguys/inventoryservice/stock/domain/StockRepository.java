@@ -42,4 +42,10 @@ public interface StockRepository {
 
     /** 조정 대상 재고를 (sku × warehouseCode)로 조회한다(수정용 — 같은 트랜잭션에서 save 시 @Version 적용). 없으면 empty. */
     Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode);
+
+    /**
+     * 출고 대상 재고를 (sku × warehouseId)로 비관락(PESSIMISTIC_WRITE)으로 조회한다(출고용 — 동시 차감을 직렬화해 음수 재고를 막는다).
+     * 잠금은 트랜잭션 커밋/롤백까지 유지되며, 잠금 대기 초과는 PessimisticLockingFailureException(LOCK_TIMEOUT, 409)으로 매핑된다. 없으면 empty.
+     */
+    Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId);
 }

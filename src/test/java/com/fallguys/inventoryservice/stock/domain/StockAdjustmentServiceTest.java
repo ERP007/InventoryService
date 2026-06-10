@@ -111,6 +111,11 @@ class StockAdjustmentServiceTest {
         }
 
         @Override
+        public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+            return Optional.ofNullable(stock);
+        }
+
+        @Override
         public Long save(Stock stock) {
             this.savedQuantity = stock.getQuantity();
             return stock.getId();
@@ -167,6 +172,12 @@ class StockAdjustmentServiceTest {
 
         @Override
         public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                String sourceRef, String warehouseCode) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
                 String sourceRef, String warehouseCode) {
             return List.of();
         }

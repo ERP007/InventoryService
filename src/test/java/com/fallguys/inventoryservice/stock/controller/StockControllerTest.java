@@ -508,6 +508,11 @@ class StockControllerTest {
                     }
                     return Optional.empty();
                 }
+
+                @Override
+                public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+                    return Optional.empty();
+                }
             };
         }
 
@@ -532,6 +537,12 @@ class StockControllerTest {
 
                 @Override
                 public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
+                        String sourceRef, String warehouseCode) {
+                    return List.of();
+                }
+
+                @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
                         String sourceRef, String warehouseCode) {
                     return List.of();
                 }

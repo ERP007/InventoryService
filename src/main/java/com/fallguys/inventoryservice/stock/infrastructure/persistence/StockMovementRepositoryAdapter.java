@@ -21,6 +21,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 import lombok.RequiredArgsConstructor;
 
@@ -69,6 +70,11 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
     @Override
     public List<InboundMovement> findInboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
         return jpaDao.findInboundBySourceRefAndWarehouseCode(sourceRef, warehouseCode);
+    }
+
+    @Override
+    public List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
+        return jpaDao.findOutboundBySourceRefAndWarehouseCode(sourceRef, warehouseCode);
     }
 
     /**
