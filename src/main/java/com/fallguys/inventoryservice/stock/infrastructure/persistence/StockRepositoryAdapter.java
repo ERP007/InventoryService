@@ -16,6 +16,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
@@ -76,6 +77,11 @@ public class StockRepositoryAdapter implements StockRepository {
     }
 
     @Override
+    public List<StockQuantity> findQuantitiesByWarehouseCodeAndSkus(String warehouseCode, List<String> skus) {
+        return jpaDao.findQuantitiesByWarehouseCodeAndSkus(warehouseCode, skus);
+    }
+
+    @Override
     public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
         return jpaDao.findSkuWarehouseStocks(sku, !warehouseCodes.isEmpty(), warehouseCodes);
     }
@@ -88,6 +94,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
         return jpaDao.findBySkuAndWarehouseCode(sku, warehouseCode).map(StockEntity::toDomain);
+    }
+
+    @Override
+    public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+        return jpaDao.findBySkuAndWarehouseIdForUpdate(sku, warehouseId).map(StockEntity::toDomain);
     }
 
     /**

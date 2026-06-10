@@ -68,6 +68,7 @@ public class SecurityConfig {
      * 서명을 검증하지 않고 Bearer 토큰 문자열을 클레임으로 펼친다.
      * 형식: {@code ROLE} 또는 {@code ROLE~TENANCY_CODE}. (구분자는 '~' — '@'는 Bearer 토큰 허용 문자가 아님)
      * 예) {@code ADMIN} → 전사 / {@code BRANCH_STAFF~WH-SE-001} → BRANCH·창고 WH-SE-001 / 미입력 → 401.
+     * employee_no·name은 'local-{ROLE}'로 합성한다(조정 이력의 수행자 사번·이름 스냅샷용).
      *
      * 주의: 서명 검증이 없으므로 절대 운영(local 외 프로파일)에서 활성화하지 않는다.
      */
@@ -83,7 +84,7 @@ public class SecurityConfig {
             return Jwt.withTokenValue(token)
                     .header("alg", "none")
                     .claim("employee_no", "local-" + role)
-                    .claim("preferred_username", "local-" + role)
+                    .claim("name", "local-" + role)
                     .claim("user_role", role)
                     .claim("tenancy_type", localTenancyType(role))
                     .claim("tenancy_code", tenancyCode)

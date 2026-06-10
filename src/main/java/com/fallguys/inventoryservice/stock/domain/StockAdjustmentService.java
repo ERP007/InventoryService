@@ -44,8 +44,9 @@ public class StockAdjustmentService {
         stockRepository.save(stock);
 
         StockMovement movement = StockMovement.createAdjustment(
-                command.sku(), stock.getWarehouseId(), delta, command.adjustmentType().toMovementType(),
-                command.reason(), stock.getQuantity(), command.memo(), command.executorEmpNo());
+                command.sku(), stock.getItemName(), stock.getItemUnit(), stock.getWarehouseId(), delta,
+                command.adjustmentType().toMovementType(), command.reason(), stock.getQuantity(),
+                command.note(), command.executorEmpNo(), command.executorName());
         StockMovement saved = stockMovementRepository.save(movement);
 
         return new StockAdjustmentResult(

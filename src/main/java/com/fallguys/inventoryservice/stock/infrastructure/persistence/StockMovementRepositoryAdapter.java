@@ -15,11 +15,13 @@ import org.springframework.stereotype.Repository;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
+import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 import lombok.RequiredArgsConstructor;
 
@@ -63,6 +65,16 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
     @Override
     public StockMovement save(StockMovement movement) {
         return jpaDao.save(StockMovementEntity.from(movement)).toDomain();
+    }
+
+    @Override
+    public List<InboundMovement> findInboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
+        return jpaDao.findInboundBySourceRefAndWarehouseCode(sourceRef, warehouseCode);
+    }
+
+    @Override
+    public List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(String sourceRef, String warehouseCode) {
+        return jpaDao.findOutboundBySourceRefAndWarehouseCode(sourceRef, warehouseCode);
     }
 
     /**

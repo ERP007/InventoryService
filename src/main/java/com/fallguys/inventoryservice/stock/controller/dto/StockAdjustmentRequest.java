@@ -20,13 +20,13 @@ public record StockAdjustmentRequest(
         @NotNull AdjustmentType adjustmentType,
         @NotNull @PositiveOrZero Integer quantity,
         @NotNull MovementReason reason,
-        String memo
+        String note
 ) {
 
     public StockAdjustmentRequest {
         sku = sku == null ? null : sku.trim();
         warehouseCode = warehouseCode == null ? null : warehouseCode.trim();
-        memo = (memo == null || memo.isBlank()) ? null : memo.trim();
+        note = (note == null || note.isBlank()) ? null : note.trim();
     }
 
     /**
@@ -42,7 +42,8 @@ public record StockAdjustmentRequest(
         return adjustmentType == AdjustmentType.ADJUST || quantity >= 1;
     }
 
-    public AdjustStockCommand toCommand(String executorEmpNo) {
-        return new AdjustStockCommand(sku, warehouseCode, adjustmentType, quantity, reason, memo, executorEmpNo);
+    public AdjustStockCommand toCommand(String executorEmpNo, String executorName) {
+        return new AdjustStockCommand(
+                sku, warehouseCode, adjustmentType, quantity, reason, note, executorEmpNo, executorName);
     }
 }

@@ -12,8 +12,10 @@ import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsEx
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.WarehouseStockQuery;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -44,6 +46,26 @@ public class StockService {
                 ? query.withWarehouseCodes(List.of(tenancyCode))
                 : query;
         return stockRepository.search(effective);
+    }
+
+    /**
+     * (창고 × SKU 집합)의 현재고·안전재고를 일괄 조회한다. 서비스 간 내부 호출 전용이라 Tenancy 범위 강제는 없다.
+     *
+     * 흐름:
+     * 1) 대상 창고가 존재하는지 확인한다 — 없으면 404로 막는다(잘못된 창고 코드를 빈 결과로 숨기지 않는다).
+     * 2) (창고 × 요청 SKU들)의 재고 수량을 조회한다. 재고 행이 없는 (sku×창고)는 결과에서 생략된다(호출 측이 0으로 간주).
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음.
+     *
+     * 예외:
+     * - 창고 없음: WarehouseNotFoundException (404)
+     */
+    @Transactional(readOnly = true)
+    public List<StockQuantity> getStockQuantities(WarehouseStockQuery query) {
+        if (!warehouseRepository.existsByCode(query.warehouseCode())) {
+            throw new WarehouseNotFoundException(query.warehouseCode());
+        }
+        return stockRepository.findQuantitiesByWarehouseCodeAndSkus(query.warehouseCode(), query.skus());
     }
 
     /**
@@ -99,7 +121,8 @@ public class StockService {
         }
 
         Stock stock = Stock.create(
-                command.sku(), command.itemName(), warehouseId, command.quantity(), command.safetyStock());
+                command.sku(), command.itemName(), command.itemUnit(), warehouseId,
+                command.quantity(), command.safetyStock());
         Long id = stockRepository.save(stock);
 
         return stockRepository.findResultById(id)

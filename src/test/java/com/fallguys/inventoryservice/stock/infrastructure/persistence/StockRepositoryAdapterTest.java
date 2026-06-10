@@ -15,10 +15,12 @@ import org.springframework.context.annotation.Import;
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.AdjustmentType;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
+import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
 import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockSortField;
@@ -46,7 +48,7 @@ class StockRepositoryAdapterTest {
 
     @Test
     void save하면_id를_발급하고_findResultById가_창고코드를_조인하며_createdAt이_채워진다() {
-        Long id = adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", 2L, 100, 50));
+        Long id = adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
 
         assertThat(id).isNotNull();
 
@@ -61,7 +63,7 @@ class StockRepositoryAdapterTest {
 
     @Test
     void existsBySkuAndWarehouseId는_저장된_조합에만_true다() {
-        adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", 2L, 100, 50));
+        adapter.save(Stock.create("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
 
         assertThat(adapter.existsBySkuAndWarehouseId("HMC-EN-00214", 2L)).isTrue();
         assertThat(adapter.existsBySkuAndWarehouseId("HMC-EN-00214", 999L)).isFalse();
@@ -177,6 +179,21 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void findQuantitiesByWarehouseCodeAndSkus는_해당창고_존재SKU만_반환하고_없는SKU와_타창고는_제외한다() {
+        seedStocks();
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
+
+        List<StockQuantity> rows = adapter.findQuantitiesByWarehouseCodeAndSkus(
+                "WH-SE-001", List.of("HMC-EN-00214", "HMC-BR-00788", "NO-SUCH"));
+
+        assertThat(rows).extracting(StockQuantity::sku)
+                .containsExactlyInAnyOrder("HMC-EN-00214", "HMC-BR-00788"); // NO-SUCH 생략
+        StockQuantity en = rows.stream().filter(r -> r.sku().equals("HMC-EN-00214")).findFirst().orElseThrow();
+        assertThat(en.quantity()).isEqualTo(120);   // WH-SE-001 값(HQ-001의 500이 아님)
+        assertThat(en.safetyStock()).isEqualTo(50);
+    }
+
+    @Test
     void findSkuWarehouseStocks_전체창고는_sku의_모든_창고행을_창고코드순으로_반환한다() {
         seedStocks();
         insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // HQ-001에도 같은 sku
@@ -250,6 +267,26 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void findBySkuAndWarehouseIdForUpdate는_비관락으로_재고를_반환한다() {
+        seedStocks();
+
+        Stock stock = adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 2L).orElseThrow();
+
+        assertThat(stock.getId()).isNotNull();
+        assertThat(stock.getWarehouseId()).isEqualTo(2L);
+        assertThat(stock.getQuantity()).isEqualTo(120);
+        assertThat(stock.getSafetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findBySkuAndWarehouseIdForUpdate는_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("HMC-EN-00214", 999L)).isEmpty();
+        assertThat(adapter.findBySkuAndWarehouseIdForUpdate("NO-SKU", 2L)).isEmpty();
+    }
+
+    @Test
     void save_기존재고는_현재고를_갱신한다() {
         seedStocks();
         Stock stock = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
@@ -277,19 +314,23 @@ class StockRepositoryAdapterTest {
     }
 
     private void insertStock(String sku, String itemName, long warehouseId, int currentStock, int safetyStock) {
+        // 오일류는 L, 그 외는 EA로 단위를 스냅샷한다(테스트 시드용 단순 파생).
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
         entityManager().createNativeQuery("""
                         INSERT INTO stock
-                            (sku, item_name, warehouse_id, current_stock, safety_stock, created_at, updated_at, version)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock,
+                             created_at, updated_at, version)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .setParameter(1, sku)
                 .setParameter(2, itemName)
-                .setParameter(3, warehouseId)
-                .setParameter(4, currentStock)
-                .setParameter(5, safetyStock)
-                .setParameter(6, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, currentStock)
+                .setParameter(6, safetyStock)
                 .setParameter(7, Instant.parse("2026-05-20T00:00:00Z"))
-                .setParameter(8, 0L)
+                .setParameter(8, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(9, 0L)
                 .executeUpdate();
     }
 

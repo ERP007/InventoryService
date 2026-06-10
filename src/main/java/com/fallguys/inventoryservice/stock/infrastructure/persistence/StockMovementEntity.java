@@ -6,6 +6,7 @@ import org.hibernate.annotations.Check;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
@@ -28,7 +29,8 @@ import lombok.NoArgsConstructor;
 /**
  * 재고 이동 이력 JPA 엔티티(append-only). 한 번 INSERT되면 UPDATE/DELETE하지 않으므로
  * 수정 시각·@Version은 두지 않고 발생 시각(performed_at)만 Auditing(@CreatedDate)으로 채운다.
- * 수행자 사번(executor_emp_no)은 감사 자동값이 아니라 도메인이 보존하는 스냅샷이라 명시 컬럼으로 둔다.
+ * 수행자 사번(executor_emp_no)·이름(executor_name), 부품명(item_name)·단위(item_unit)는 감사 자동값이 아니라
+ * 도메인이 변동 당시를 박제한 스냅샷이라 명시 컬럼으로 둔다(Item/User 마스터와 실시간 일치는 보장하지 않는다).
  *
  * 제약:
  * - UNIQUE(source_ref, source_line_no, warehouse_id): PO/SO 문서 라인의 창고별 중복 적재 방지(멱등 보조).
@@ -58,6 +60,13 @@ public class StockMovementEntity {
     @Column(nullable = false)
     private String sku;
 
+    @Column(name = "item_name", nullable = false)
+    private String itemName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_unit", nullable = false)
+    private ItemUnit itemUnit;
+
     @Column(name = "warehouse_id", nullable = false)
     private Long warehouseId;
 
@@ -80,19 +89,25 @@ public class StockMovementEntity {
     @Column(name = "stock_after", nullable = false)
     private int stockAfter;
 
-    private String memo;
+    @Column(name = "note")
+    private String note;
 
     @Column(name = "executor_emp_no", nullable = false)
     private String executorEmpNo;
+
+    @Column(name = "executor_name", nullable = false)
+    private String executorName;
 
     @CreatedDate
     @Column(name = "performed_at", updatable = false, nullable = false)
     private Instant performedAt;
 
-    private StockMovementEntity(String sku, Long warehouseId, int delta, MovementType type, MovementReason reason,
-                                String sourceRef, Integer sourceLineNo, int stockAfter, String memo,
-                                String executorEmpNo) {
+    private StockMovementEntity(String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int delta,
+                                MovementType type, MovementReason reason, String sourceRef, Integer sourceLineNo,
+                                int stockAfter, String note, String executorEmpNo, String executorName) {
         this.sku = sku;
+        this.itemName = itemName;
+        this.itemUnit = itemUnit;
         this.warehouseId = warehouseId;
         this.delta = delta;
         this.type = type;
@@ -100,20 +115,22 @@ public class StockMovementEntity {
         this.sourceRef = sourceRef;
         this.sourceLineNo = sourceLineNo;
         this.stockAfter = stockAfter;
-        this.memo = memo;
+        this.note = note;
         this.executorEmpNo = executorEmpNo;
+        this.executorName = executorName;
     }
 
     /** 신규 이동 이력 도메인을 영속 엔티티로 변환한다(id·performed_at은 IDENTITY·Auditing이 채운다). */
     public static StockMovementEntity from(StockMovement movement) {
-        return new StockMovementEntity(movement.getSku(), movement.getWarehouseId(), movement.getDelta(),
-                movement.getType(), movement.getReason(), movement.getSourceRef(), movement.getSourceLineNo(),
-                movement.getStockAfter(), movement.getMemo(), movement.getExecutorEmpNo());
+        return new StockMovementEntity(movement.getSku(), movement.getItemName(), movement.getItemUnit(),
+                movement.getWarehouseId(), movement.getDelta(), movement.getType(), movement.getReason(),
+                movement.getSourceRef(), movement.getSourceLineNo(), movement.getStockAfter(), movement.getNote(),
+                movement.getExecutorEmpNo(), movement.getExecutorName());
     }
 
     /** 영속 엔티티를 도메인 모델로 변환한다(조회). */
     public StockMovement toDomain() {
-        return StockMovement.of(id, sku, warehouseId, delta, type, reason, sourceRef, sourceLineNo,
-                stockAfter, memo, executorEmpNo, performedAt);
+        return StockMovement.of(id, sku, itemName, itemUnit, warehouseId, delta, type, reason, sourceRef,
+                sourceLineNo, stockAfter, note, executorEmpNo, executorName, performedAt);
     }
 }

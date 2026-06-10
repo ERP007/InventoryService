@@ -10,16 +10,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.stock.domain.MovementType;
+import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
+import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, Long> {
 
     /**
      * 조회 조건으로 이동 이력을 검색해 읽기 모델(MovementSummary)로 투영한다.
      *
-     * 조인: WarehouseEntity(창고 코드·이름)는 INNER, StockEntity(부품명 스냅샷)는 LEFT로 (sku × warehouse) 매칭.
-     *       재고 행이 없어도 이력은 노출된다. 부품명은 잠정적으로 stock 스냅샷을 쓰며, 추후 Item 마스터 기준으로 대체한다(TODO).
+     * 조인: WarehouseEntity(창고 코드·이름)만 INNER로 매칭한다. 부품명·단위는 이동 이력 자체 스냅샷(m.itemName·m.itemUnit)을 쓴다.
      * 필터(각 조건은 파라미터로 on/off):
      *   - keyword: 부품명/SKU 부분 일치(대소문자 무시, 호출부가 소문자 LIKE 패턴을 만들어 전달).
      *   - warehouseCodes: hasWarehouseFilter=true일 때만 w.code IN 으로 제한.
@@ -29,12 +30,11 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
      */
     @Query(value = """
             SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementSummary(
-                m.id, m.performedAt, m.sku, s.itemName, w.code, w.name,
+                m.id, m.performedAt, m.sku, m.itemName, m.itemUnit, w.code, w.name,
                 m.delta, m.type, m.reason, m.sourceRef, m.executorEmpNo)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
-            LEFT JOIN StockEntity s ON s.sku = m.sku AND s.warehouseId = m.warehouseId
-            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
+            WHERE (:keyword IS NULL OR LOWER(m.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:type IS NULL OR m.type = :type)
               AND m.performedAt >= :fromInstant
@@ -44,8 +44,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             SELECT COUNT(m)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
-            LEFT JOIN StockEntity s ON s.sku = m.sku AND s.warehouseId = m.warehouseId
-            WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
+            WHERE (:keyword IS NULL OR LOWER(m.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:type IS NULL OR m.type = :type)
               AND m.performedAt >= :fromInstant
@@ -66,7 +65,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementHistory(
-                m.type, m.delta, m.executorEmpNo, m.performedAt)
+                m.type, m.delta, m.executorEmpNo, m.executorName, m.performedAt)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
             WHERE m.sku = :sku
@@ -93,4 +92,36 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes,
             @Param("since") Instant since);
+
+    /**
+     * (sourceRef × 창고)의 INBOUND 이동 이력을 결과 투영(InboundMovement)으로 조회한다(입고 멱등 replay).
+     * 조인: WarehouseEntity를 (m.warehouseId = w.id)로 조인해 창고 코드로 한정한다. id 오름차순(적재 순서)으로 반환한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.InboundMovement(
+                m.id, m.sku, m.delta, m.stockAfter)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE m.sourceRef = :sourceRef AND w.code = :warehouseCode
+              AND m.type = com.fallguys.inventoryservice.stock.domain.MovementType.INBOUND
+            ORDER BY m.id
+            """)
+    List<InboundMovement> findInboundBySourceRefAndWarehouseCode(
+            @Param("sourceRef") String sourceRef, @Param("warehouseCode") String warehouseCode);
+
+    /**
+     * (sourceRef × 창고)의 OUTBOUND 이동 이력을 결과 투영(OutboundMovement)으로 조회한다(출고 멱등 replay).
+     * 조인: WarehouseEntity를 (m.warehouseId = w.id)로 조인해 창고 코드로 한정한다. id 오름차순(적재 순서)으로 반환한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.OutboundMovement(
+                m.id, m.sku, m.delta, m.stockAfter)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE m.sourceRef = :sourceRef AND w.code = :warehouseCode
+              AND m.type = com.fallguys.inventoryservice.stock.domain.MovementType.OUTBOUND
+            ORDER BY m.id
+            """)
+    List<OutboundMovement> findOutboundBySourceRefAndWarehouseCode(
+            @Param("sourceRef") String sourceRef, @Param("warehouseCode") String warehouseCode);
 }
