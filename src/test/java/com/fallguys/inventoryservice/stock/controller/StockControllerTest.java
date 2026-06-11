@@ -4,6 +4,7 @@ import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,9 +23,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
 import com.fallguys.inventoryservice.stock.domain.ItemInfoProvider;
+import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.Stock;
@@ -35,6 +39,7 @@ import com.fallguys.inventoryservice.stock.domain.StockAdjustmentService;
 import com.fallguys.inventoryservice.stock.domain.StockKpiService;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
@@ -250,6 +255,79 @@ class StockControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("STOCK_ALREADY_EXISTS"));
+    }
+
+    // ---- GET/PATCH /{warehouseCode}/{sku}/safety-stock (안전재고 조정) : ADMIN·HQ_MANAGER 전용 ----
+
+    @Test
+    void 안전재고_프리필조회는_200과_현재안전재고_version을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sku").value("HMC-EN-00214"))
+                .andExpect(jsonPath("$.safetyStock").value(50))
+                .andExpect(jsonPath("$.version").value(3));
+    }
+
+    @Test
+    void 안전재고_프리필조회_BRANCH는_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 안전재고_프리필조회_재고없으면_404와_STOCK_NOT_FOUND를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/NO-SUCH/safety-stock").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
+    }
+
+    @Test
+    void 안전재고_수정은_200과_갱신된_safetyStock_version을_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.HQ_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":60,"version":3}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.safetyStock").value(60))
+                .andExpect(jsonPath("$.version").value(4));
+    }
+
+    @Test
+    void 안전재고_수정_version불일치면_409와_OPTIMISTIC_LOCK_CONFLICT를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":60,"version":99}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("OPTIMISTIC_LOCK_CONFLICT"));
+    }
+
+    @Test
+    void 안전재고_수정_음수면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":-1,"version":3}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void 안전재고_수정_BRANCH는_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":60,"version":3}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     // ---- GET /{sku} (상세 패널) : 전체 Role, Tenancy 차등 ----
@@ -513,6 +591,26 @@ class StockControllerTest {
                 @Override
                 public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
                     return Optional.empty();
+                }
+
+                @Override
+                public Optional<SafetyStockEdit> findSafetyStockEdit(String warehouseCode, String sku) {
+                    if ("WH-SE-001".equals(warehouseCode) && "HMC-EN-00214".equals(sku)) {
+                        return Optional.of(new SafetyStockEdit(sku, warehouseCode, "엔진오일 필터", ItemUnit.EA, 120, 50, 3L));
+                    }
+                    return Optional.empty();
+                }
+
+                @Override
+                public SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command) {
+                    if (!"HMC-EN-00214".equals(command.sku())) {
+                        throw new StockNotFoundException(command.warehouseCode(), command.sku());
+                    }
+                    if (command.version() != 3L) { // version 불일치 모사
+                        throw new OptimisticLockConflictException("conflict");
+                    }
+                    return new SafetyStockEdit(command.sku(), command.warehouseCode(), "엔진오일 필터", ItemUnit.EA,
+                            120, command.safetyStock(), 4L);
                 }
             };
         }
