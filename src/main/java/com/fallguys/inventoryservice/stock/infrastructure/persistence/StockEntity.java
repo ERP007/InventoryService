@@ -107,4 +107,9 @@ public class StockEntity {
         this.currentStock = stock.getQuantity();
         this.safetyStock = stock.getSafetyStock();
     }
+
+    /** 안전재고만 절대값으로 교체한다(현재고·식별·감사 컬럼은 건드리지 않음). 안전재고 조정 전용. */
+    public void updateSafetyStock(int safetyStock) {
+        this.safetyStock = safetyStock;
+    }
 }

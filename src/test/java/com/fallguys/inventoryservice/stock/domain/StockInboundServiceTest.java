@@ -168,6 +168,18 @@ class StockInboundServiceTest {
         }
 
         @Override
+        public Optional<com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit> findSafetyStockEdit(
+                String warehouseCode, String sku) {
+            return Optional.empty();
+        }
+
+        @Override
+        public com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit updateSafetyStock(
+                com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand command) {
+            return null;
+        }
+
+        @Override
         public Long save(Stock stock) {
             this.lastSaved = stock;
             return stock.getId();

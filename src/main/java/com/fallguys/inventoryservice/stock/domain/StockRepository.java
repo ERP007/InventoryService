@@ -3,6 +3,8 @@ package com.fallguys.inventoryservice.stock.domain;
 import java.util.List;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -48,4 +50,13 @@ public interface StockRepository {
      * 잠금은 트랜잭션 커밋/롤백까지 유지되며, 잠금 대기 초과는 PessimisticLockingFailureException(LOCK_TIMEOUT, 409)으로 매핑된다. 없으면 empty.
      */
     Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId);
+
+    /** 안전재고 조정 프리필용: (창고 코드 × sku)의 현재 안전재고·현재고·부품정보·version을 조회한다. 행이 없으면 empty. */
+    Optional<SafetyStockEdit> findSafetyStockEdit(String warehouseCode, String sku);
+
+    /**
+     * (sku × warehouseCode) 행의 안전재고를 절대값으로 교체하고 갱신 결과(version 포함)를 반환한다.
+     * 클라이언트 version이 현재와 다르면 OptimisticLockConflictException(409), 행이 없으면 StockNotFoundException(404).
+     */
+    SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command);
 }

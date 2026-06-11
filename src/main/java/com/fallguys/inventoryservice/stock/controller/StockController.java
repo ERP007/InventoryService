@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,9 @@ import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
+import com.fallguys.inventoryservice.stock.controller.dto.SafetyStockEditResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.SafetyStockResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.SafetyStockUpdateRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockAdjustmentRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.StockAdjustmentResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.StockCreateRequest;
@@ -33,6 +37,7 @@ import com.fallguys.inventoryservice.stock.domain.StockAdjustmentService;
 import com.fallguys.inventoryservice.stock.domain.StockKpiService;
 import com.fallguys.inventoryservice.stock.domain.StockService;
 import com.fallguys.inventoryservice.stock.domain.StockSkuDetailService;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockAdjustmentResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -218,5 +223,49 @@ public class StockController {
         String executorName = JwtClaimExtractor.extractName(jwt);
         StockAdjustmentResult result = stockAdjustmentService.adjust(request.toCommand(executorEmpNo, executorName));
         return ResponseEntity.ok(StockAdjustmentResponse.from(result));
+    }
+
+    /**
+     * 안전재고 조정 모달 프리필을 조회한다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * (창고 × 부품)의 현재 안전재고·현재고와 후속 수정용 version을 반환한다. 재고 행이 없으면 404(STOCK_NOT_FOUND).
+     */
+    @Operation(
+            summary = "안전재고 조정 프리필 조회(ADMIN·HQ_MANAGER)",
+            description = "재고 조회 화면 '안전 재고 조정' 버튼 → 모달 프리필용. (warehouseCode × sku)의 현재 안전재고·현재고·version을 반환한다."
+    )
+    @GetMapping("/{warehouseCode}/{sku}/safety-stock")
+    public ResponseEntity<SafetyStockEditResponse> safetyStockEdit(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "창고 비즈니스 코드 (예: WH-SE-001)")
+            @PathVariable String warehouseCode,
+            @Parameter(description = "부품 코드 (예: HMC-EN-00214)")
+            @PathVariable String sku
+    ) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        SafetyStockEdit edit = stockService.getSafetyStockEdit(warehouseCode, sku);
+        return ResponseEntity.ok(SafetyStockEditResponse.from(edit));
+    }
+
+    /**
+     * 안전재고를 수정한다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * safetyStock을 절대값으로 교체하며 version으로 낙관적 락을 검증한다(수량·이동 이력은 건드리지 않음).
+     * 값 오류(누락·음수)는 400(INVALID_PARAMETER), 재고 행 없음은 404(STOCK_NOT_FOUND), version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT).
+     */
+    @Operation(
+            summary = "안전재고 수정(ADMIN·HQ_MANAGER)",
+            description = "프리필된 안전재고를 조정한 뒤 최종 저장한다. safetyStock(절대값)·version을 받으며, 동시 수정은 version으로 거부한다."
+    )
+    @PatchMapping("/{warehouseCode}/{sku}/safety-stock")
+    public ResponseEntity<SafetyStockResponse> updateSafetyStock(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "창고 비즈니스 코드 (예: WH-SE-001)")
+            @PathVariable String warehouseCode,
+            @Parameter(description = "부품 코드 (예: HMC-EN-00214)")
+            @PathVariable String sku,
+            @Valid @RequestBody SafetyStockUpdateRequest request
+    ) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        SafetyStockEdit updated = stockService.updateSafetyStock(request.toCommand(warehouseCode, sku));
+        return ResponseEntity.ok(SafetyStockResponse.from(updated));
     }
 }

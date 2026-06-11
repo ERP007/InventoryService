@@ -1,6 +1,7 @@
 package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.List;
@@ -13,11 +14,15 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
 import com.fallguys.inventoryservice.config.JpaAuditingConfig;
+import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.AdjustmentType;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
+import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -299,6 +304,60 @@ class StockRepositoryAdapterTest {
         Stock reloaded = adapter.findBySkuAndWarehouseCode("HMC-EN-00214", "WH-SE-001").orElseThrow();
         assertThat(delta).isEqualTo(-20);
         assertThat(reloaded.getQuantity()).isEqualTo(100);
+    }
+
+    @Test
+    void findSafetyStockEdit_현재안전재고와_version을_반환한다() {
+        seedStocks();
+
+        SafetyStockEdit edit = adapter.findSafetyStockEdit("WH-SE-001", "HMC-EN-00214").orElseThrow();
+
+        assertThat(edit.sku()).isEqualTo("HMC-EN-00214");
+        assertThat(edit.warehouseCode()).isEqualTo("WH-SE-001");
+        assertThat(edit.quantity()).isEqualTo(120);
+        assertThat(edit.safetyStock()).isEqualTo(50);
+        assertThat(edit.version()).isNotNull();
+    }
+
+    @Test
+    void findSafetyStockEdit_재고행이_없으면_empty다() {
+        seedStocks();
+
+        assertThat(adapter.findSafetyStockEdit("WH-SE-001", "NO-SUCH")).isEmpty();
+    }
+
+    @Test
+    void updateSafetyStock_version이_일치하면_안전재고를_교체하고_version을_올린다() {
+        seedStocks();
+        SafetyStockEdit before = adapter.findSafetyStockEdit("WH-SE-001", "HMC-EN-00214").orElseThrow();
+
+        SafetyStockEdit after = adapter.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 80, before.version()));
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(after.safetyStock()).isEqualTo(80);
+        SafetyStockEdit reloaded = adapter.findSafetyStockEdit("WH-SE-001", "HMC-EN-00214").orElseThrow();
+        assertThat(reloaded.safetyStock()).isEqualTo(80);
+        assertThat(reloaded.quantity()).isEqualTo(120); // 현재고는 건드리지 않는다
+    }
+
+    @Test
+    void updateSafetyStock_version이_불일치하면_OptimisticLockConflictException() {
+        seedStocks();
+
+        assertThatThrownBy(() -> adapter.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 80, 999L)))
+                .isInstanceOf(OptimisticLockConflictException.class);
+    }
+
+    @Test
+    void updateSafetyStock_재고행이_없으면_StockNotFoundException() {
+        seedStocks();
+
+        assertThatThrownBy(() -> adapter.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "NO-SUCH", 80, 0L)))
+                .isInstanceOf(StockNotFoundException.class);
     }
 
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,
