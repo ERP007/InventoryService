@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.shared.security.TestJwtDecoderConfig;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
@@ -32,7 +33,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
 
 @WebMvcTest(StockMovementController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, StockMovementControllerTest.StubConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, TestJwtDecoderConfig.class, StockMovementControllerTest.StubConfig.class})
 class StockMovementControllerTest {
 
     @Autowired

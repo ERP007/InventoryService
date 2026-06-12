@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.shared.security.TestJwtDecoderConfig;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
@@ -39,7 +40,7 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 @WebMvcTest(StockQuantityController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, StockQuantityControllerTest.StubConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, TestJwtDecoderConfig.class, StockQuantityControllerTest.StubConfig.class})
 class StockQuantityControllerTest {
 
     @Autowired

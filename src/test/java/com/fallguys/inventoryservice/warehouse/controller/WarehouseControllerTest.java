@@ -29,6 +29,7 @@ import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationReposit
 import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.shared.security.TestJwtDecoderConfig;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
@@ -42,7 +43,7 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 @WebMvcTest(WarehouseController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, WarehouseControllerTest.StubConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, TestJwtDecoderConfig.class, WarehouseControllerTest.StubConfig.class})
 class WarehouseControllerTest {
 
     @Autowired
