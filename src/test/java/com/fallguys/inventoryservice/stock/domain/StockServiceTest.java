@@ -11,10 +11,12 @@ import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
+import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -187,6 +189,39 @@ class StockServiceTest {
     }
 
     @Test
+    void getSafetyStockEdit_재고행이_있으면_프리필을_반환한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        stockRepository.safetyEdit = new SafetyStockEdit("HMC-EN-00214", "WH-SE-001", "엔진오일 필터", ItemUnit.EA, 120, 50, 3L);
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        SafetyStockEdit edit = service.getSafetyStockEdit("WH-SE-001", "HMC-EN-00214");
+
+        assertThat(edit.safetyStock()).isEqualTo(50);
+        assertThat(edit.version()).isEqualTo(3L);
+    }
+
+    @Test
+    void getSafetyStockEdit_재고행이_없으면_StockNotFoundException() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.getSafetyStockEdit("WH-SE-001", "NO-SUCH"))
+                .isInstanceOf(StockNotFoundException.class);
+    }
+
+    @Test
+    void updateSafetyStock_커맨드를_위임하고_갱신결과를_반환한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        SafetyStockEdit result = service.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 60, 3L));
+
+        assertThat(result.safetyStock()).isEqualTo(60);
+        assertThat(result.version()).isEqualTo(4L);
+    }
+
+    @Test
     void getStockQuantities_창고가_있으면_재고수량_리스트를_반환한다() {
         StubStockRepository stockRepository = new StubStockRepository();
         stockRepository.quantities = List.of(
@@ -214,6 +249,7 @@ class StockServiceTest {
 
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
+        private SafetyStockEdit safetyEdit;
         private Stock saved;
         private Long savedWarehouseId;
         private StockSearchQuery searchArg;
@@ -281,6 +317,17 @@ class StockServiceTest {
         @Override
         public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
             return Optional.empty();
+        }
+
+        @Override
+        public Optional<SafetyStockEdit> findSafetyStockEdit(String warehouseCode, String sku) {
+            return Optional.ofNullable(safetyEdit);
+        }
+
+        @Override
+        public SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command) {
+            return new SafetyStockEdit(command.sku(), command.warehouseCode(), "엔진오일 필터", ItemUnit.EA,
+                    120, command.safetyStock(), command.version() + 1);
         }
     }
 

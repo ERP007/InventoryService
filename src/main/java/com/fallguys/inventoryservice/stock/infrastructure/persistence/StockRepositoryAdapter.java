@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -9,11 +10,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.JpaSort;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
+import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
+import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -99,6 +105,41 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
         return jpaDao.findBySkuAndWarehouseIdForUpdate(sku, warehouseId).map(StockEntity::toDomain);
+    }
+
+    @Override
+    public Optional<SafetyStockEdit> findSafetyStockEdit(String warehouseCode, String sku) {
+        return jpaDao.findBySkuAndWarehouseCode(sku, warehouseCode)
+                .map(entity -> toSafetyStockEdit(warehouseCode, entity));
+    }
+
+    /**
+     * 안전재고를 교체한다(load-modify 방식). 클라이언트 version과 현재 version을 명시 비교해 다르면 409로 막고(분실 갱신 방지의 핵심),
+     * flush 시 @Version이 한 번 더 동시 수정을 검증한다(그 실패도 409로 번역). 갱신 결과를 읽기 모델로 반환한다.
+     */
+    @Override
+    public SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command) {
+        StockEntity entity = jpaDao.findBySkuAndWarehouseCode(command.sku(), command.warehouseCode())
+                .orElseThrow(() -> new StockNotFoundException(command.warehouseCode(), command.sku()));
+        if (!Objects.equals(entity.getVersion(), command.version())) {
+            throw new OptimisticLockConflictException(
+                    "재고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
+        }
+        entity.updateSafetyStock(command.safetyStock());
+        try {
+            jpaDao.saveAndFlush(entity);
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new OptimisticLockConflictException(
+                    "재고가 이미 변경되었습니다. 최신 상태로 재조회 후 다시 시도하세요.");
+        }
+        return toSafetyStockEdit(command.warehouseCode(), entity);
+    }
+
+    /** 영속 엔티티를 안전재고 조정 읽기 모델로 변환한다(warehouseCode는 조회 입력을 그대로 사용 — 엔티티엔 코드가 없다). */
+    private SafetyStockEdit toSafetyStockEdit(String warehouseCode, StockEntity entity) {
+        return new SafetyStockEdit(
+                entity.getSku(), warehouseCode, entity.getItemName(), entity.getItemUnit(),
+                entity.getCurrentStock(), entity.getSafetyStock(), entity.getVersion());
     }
 
     /**
