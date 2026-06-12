@@ -37,7 +37,7 @@ public class StockInboundService {
      * 1) 창고 코드를 실제 창고로 해석한다(없으면 404). 비활성 창고면 입고를 거부한다(400).
      * 2) 멱등: 같은 (sourceRef × 창고)로 이미 적재된 INBOUND 이력이 있으면 그 결과를 그대로 반환한다(replay, 재증가 없음).
      * 3) 각 라인의 재고 행을 조회해 수량을 증가시킨다. 행이 없으면(첫 입고) Item 서비스에서 부품명·단위·기본 안전재고를
-     *    받아 신규 행을 만든다(Item에 sku가 없으면 404, Item 호출 실패면 503). 같은 변동으로 INBOUND 이력을 1건 생성·저장한다.
+     *    받아 신규 행을 만든다(Item에 sku가 없으면 404, Item 호출 실패면 502). 같은 변동으로 INBOUND 이력을 1건 생성·저장한다.
      *
      * 트랜잭션: 쓰기. 라인 원자성 — 한 라인이라도 실패하면 전체 롤백된다(전부 반영 또는 전무).
      *  신규 행 생성 시 Item 외부 호출이 트랜잭션 안에서 일어난다(첫 입고에 한정, 빈도 낮아 허용. 통합 비활성이면 호출 없이 404).
@@ -47,7 +47,7 @@ public class StockInboundService {
      * - 창고 없음: WarehouseNotFoundException (404)
      * - 비활성 창고: WarehouseInactiveException (400)
      * - 신규 행인데 Item에 부품 없음(통합 비활성 포함): ItemNotFoundException (404)
-     * - Item 호출 기술 실패: ItemServiceUnavailableException (503)
+     * - Item 호출 기술 실패: ItemServiceUnavailableException (502)
      */
     @Transactional
     public InboundResult inbound(InboundCommand command) {
