@@ -5,8 +5,9 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Keycloak 공개키(JWK) 엔드포인트. jwk-set-uri는 지연 로딩이라 기동 시 네트워크 호출이 없다.
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/erp/protocol/openid-connect/certs}
+          # Keycloak issuer(realm 베이스 — '/protocol/openid-connect/certs' 붙이지 말 것). issuer-uri는 첫 토큰 검증 시
+          # OIDC 디스커버리(.well-known/openid-configuration)로 jwks_uri·issuer를 받는다(지연, 기동 시 호출 없음).
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.erp007.xyz/realms/master}
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventory}
     username: ${DB_USERNAME:postgres}

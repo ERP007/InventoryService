@@ -42,7 +42,7 @@ public class ItemInfoClientAdapter implements ItemInfoProvider {
         this.baseUrl = baseUrl;
         // Item 호출에 connect/read 타임아웃을 명시한다. 없으면(RestClient.create() 기본) Item 지연 시 호출 스레드가 무한 블로킹된다.
         // 신규행 생성은 이 호출이 inbound 쓰기 트랜잭션 안에서 일어나 워커 스레드와 DB 커넥션이 함께 묶이므로, 풀 고갈로 번질 수 있다.
-        // 타임아웃 초과는 RestClientException으로 떠서 아래 catch → ItemServiceUnavailableException(503)으로 번역된다(§10).
+        // 타임아웃 초과는 RestClientException으로 떠서 아래 catch → ItemServiceUnavailableException(502)으로 번역된다(§10).
         // 자동구성(RestClient.Builder)에 의존하지 않고 JDK 클라이언트를 직접 구성한다(컨텍스트 결정성).
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(connectTimeoutMs))

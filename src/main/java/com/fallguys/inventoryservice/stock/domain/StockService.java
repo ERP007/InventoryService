@@ -89,7 +89,7 @@ public class StockService {
      * 예외:
      * - 담당 창고 불일치(존재 은닉): StockNotFoundException (404)
      * - 통합 활성 + Item 마스터에 없는 sku: StockNotFoundException (404)
-     * - 통합 활성 + Item 호출 기술 실패(타임아웃·연결·5xx): ItemServiceUnavailableException (503)
+     * - 통합 활성 + Item 호출 기술 실패(타임아웃·연결·5xx): ItemServiceUnavailableException (502)
      */
     @Transactional(readOnly = true)
     public StockDetail getDetail(String warehouseCode, String sku, String tenancyCode) {
