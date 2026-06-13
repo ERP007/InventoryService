@@ -27,6 +27,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+
     /** 인증 없이 접근 가능한 경로: 헬스 체크와 API 문서. */
     private static final String[] PUBLIC_PATHS = {
             "/inventory/health",
