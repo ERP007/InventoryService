@@ -2,6 +2,7 @@ package com.fallguys.inventoryservice.shared.security;
 
 import java.util.Set;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
@@ -17,6 +18,7 @@ import com.fallguys.inventoryservice.shared.model.UserRole;
  * 미인증(토큰 없음)은 리소스 서버 필터가 401로 처리하므로 여기서는 다루지 않고,
  * 인증은 됐으나 필요한 클레임이 없거나 매핑 불가하면 {@link ForbiddenException}(403)으로 통일한다.
  */
+@Slf4j
 public final class JwtClaimExtractor {
 
     private static final String ROLE_CLAIM = "user_role";
@@ -31,6 +33,7 @@ public final class JwtClaimExtractor {
     /** 권한(user_role)을 {@link UserRole}로 반환한다. 클레임 누락·매핑 불가 시 {@link ForbiddenException}. */
     public static UserRole extractRole(Jwt jwt) {
         String role = requireClaim(jwt.getClaimAsString(ROLE_CLAIM));
+        log.warn("INVENTORY received JWT claims = {}", jwt.getClaims()); // 테스트용
         try {
             return UserRole.valueOf(role);
         } catch (IllegalArgumentException notAUserRole) {
