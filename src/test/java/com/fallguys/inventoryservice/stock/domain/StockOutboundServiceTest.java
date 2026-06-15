@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.stock.domain.command.OutboundCommand;
 import com.fallguys.inventoryservice.stock.domain.command.OutboundLine;
 import com.fallguys.inventoryservice.stock.domain.exception.InsufficientStockException;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
@@ -137,6 +138,19 @@ class StockOutboundServiceTest {
         assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
                 .isInstanceOf(InsufficientStockException.class);
         assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(10); // 도메인이 검증 실패 시 현재고 보존
+        assertThat(movementRepo.saved).isEmpty();
+    }
+
+    @Test
+    void 비활성_아이템이면_ItemInactiveException이고_차감되지_않는다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.put(Stock.of(11L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50, false));
+        StubMovementRepository movementRepo = new StubMovementRepository();
+        StockOutboundService service = new StockOutboundService(stockRepo, movementRepo, new StubWarehouseRepository(2L, true));
+
+        assertThatThrownBy(() -> service.outbound(command(List.of(new OutboundLine("HMC-EN-00214", 20, 1)))))
+                .isInstanceOf(ItemInactiveException.class);
+        assertThat(stockRepo.get("HMC-EN-00214").getQuantity()).isEqualTo(100); // 차감 안 됨
         assertThat(movementRepo.saved).isEmpty();
     }
 

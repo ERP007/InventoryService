@@ -27,6 +27,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+
     /** 인증 없이 접근 가능한 경로: 헬스 체크와 API 문서. */
     private static final String[] PUBLIC_PATHS = {
             "/inventory/health",
@@ -71,7 +72,7 @@ public class SecurityConfig {
      * employee_no·name은 'local-{ROLE}'로 합성한다(조정 이력의 수행자 사번·이름 스냅샷용).
      *
      * 주의: 서명 검증이 없으므로 절대 운영(local 외 프로파일)에서 활성화하지 않는다.
-     *//*
+     */
     @Bean
     @Profile("local")
     public JwtDecoder localRoleJwtDecoder() {
@@ -94,7 +95,7 @@ public class SecurityConfig {
         };
     }
 
-    *//** 로컬 디코더용: user_role 접두어로 tenancy_type을 유추한다(HQ_* → HQ, BRANCH_* → BRANCH, 그 외 → ADMIN). *//*
+    /** 로컬 디코더용: user_role 접두어로 tenancy_type을 유추한다(HQ_* → HQ, BRANCH_* → BRANCH, 그 외 → ADMIN). */
     private static String localTenancyType(String role) {
         if (role.startsWith("HQ")) {
             return "HQ";
@@ -103,5 +104,5 @@ public class SecurityConfig {
             return "BRANCH";
         }
         return "ADMIN";
-    }*/
+    }
 }

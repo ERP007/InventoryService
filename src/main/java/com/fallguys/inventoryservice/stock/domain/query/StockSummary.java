@@ -5,8 +5,9 @@ import java.time.Instant;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 
 /**
- * 재고 목록 조회 전용 읽기 모델. 재고 속성에 창고(code·name)를 조인해 표현한다.
+ * 재고 목록 조회 전용 읽기 모델. 재고 속성에 창고(code·name·active)를 조인해 표현한다.
  * status는 quantity·safetyStock에서 파생되므로 보관하지 않는다(응답에서 계산).
+ * warehouseActive=false면 화면이 부품명·코드를 흐리게 표시한다(비활성 창고 재고).
  */
 public record StockSummary(
         Long id,
@@ -18,6 +19,8 @@ public record StockSummary(
         String warehouseName,
         int quantity,
         int safetyStock,
-        Instant lastAdjustedAt
+        Instant lastAdjustedAt,
+        boolean warehouseActive,
+        boolean itemActive
 ) {
 }

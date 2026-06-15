@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
@@ -32,7 +33,7 @@ public class StockSkuDetailService {
      *
      * 흐름:
      * 1) BRANCH는 자기 창고(tenancy_code)로, ADMIN·HQ는 전사로 조회 범위를 정한다.
-     * 2) sku의 창고별 재고 행을 조회한다. 범위 내에 한 건도 없으면 404(존재 은닉) — 소속 외 sku도 "없음"으로 응답.
+     * 2) sku의 창고별 재고 행을 조회한다. 범위 내에 한 건도 없으면 404(존재 은닉). 부품이 비활성이면 400(상세는 활성 부품만 제공).
      * 3) 전체 현재고·안전재고 합계와 최근 이동 이력 5건을 모은다(부품명·단위는 stock 스냅샷).
      * 4) 대분류·중분류는 외부 Item 서비스에서 조회한다. 통합 비활성/호출 실패 시 null로 강등한다(패널은 정상 반환).
      *
@@ -41,6 +42,7 @@ public class StockSkuDetailService {
      *
      * 예외:
      * - 범위 내 재고 없음(존재 은닉 포함): StockNotFoundException (404)
+     * - 비활성 부품(SKU): ItemInactiveException (400) — 상세 패널은 활성 부품만 제공한다
      * - Item 호출 실패: 내부에서 잡아 카테고리를 null로 강등(예외를 전파하지 않음)
      */
     public StockSkuDetail getSkuDetail(String sku, TenancyType tenancyType, String tenancyCode) {
@@ -48,6 +50,10 @@ public class StockSkuDetailService {
         List<StockSkuRow> rows = stockRepository.findSkuWarehouseStocks(sku, scope);
         if (rows.isEmpty()) {
             throw new StockNotFoundException(sku);
+        }
+        // 비활성 부품(SKU)은 상세 패널을 제공하지 않는다(목록·이력엔 노출되지만 상세 조회는 막는다).
+        if (rows.stream().anyMatch(row -> !row.itemActive())) {
+            throw new ItemInactiveException(sku);
         }
         int totalQuantity = rows.stream().mapToInt(StockSkuRow::quantity).sum();
         int totalSafetyStock = rows.stream().mapToInt(StockSkuRow::safetyStock).sum();

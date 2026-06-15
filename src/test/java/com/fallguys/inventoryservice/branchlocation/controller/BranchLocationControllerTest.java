@@ -25,9 +25,10 @@ import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationReposit
 import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationService;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
+import com.fallguys.inventoryservice.shared.security.TestJwtDecoderConfig;
 
 @WebMvcTest(BranchLocationController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class, BranchLocationControllerTest.StubConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, TestJwtDecoderConfig.class, BranchLocationControllerTest.StubConfig.class})
 class BranchLocationControllerTest {
 
     @Autowired

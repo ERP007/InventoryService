@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fallguys.inventoryservice.stock.domain.command.InboundCommand;
 import com.fallguys.inventoryservice.stock.domain.command.InboundLine;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.InboundResult;
@@ -46,6 +47,7 @@ public class StockInboundService {
      * 예외:
      * - 창고 없음: WarehouseNotFoundException (404)
      * - 비활성 창고: WarehouseInactiveException (400)
+     * - 비활성 부품(기존 재고 행): ItemInactiveException (400)
      * - 신규 행인데 Item에 부품 없음(통합 비활성 포함): ItemNotFoundException (404)
      * - Item 호출 기술 실패: ItemServiceUnavailableException (502)
      */
@@ -70,6 +72,10 @@ public class StockInboundService {
         for (InboundLine line : command.lines()) {
             Stock stock = stockRepository.findBySkuAndWarehouseCode(line.sku(), command.warehouseCode())
                     .orElseGet(() -> createNewStock(line.sku(), warehouseId));
+            // 비활성 부품(SKU)은 입고할 수 없다. 신규 행은 활성으로 생성되므로 이 검증을 통과한다.
+            if (!stock.isItemActive()) {
+                throw new ItemInactiveException(line.sku());
+            }
             int delta = stock.increase(line.quantity());
             stockRepository.save(stock);
             StockMovement movement = StockMovement.createInbound(
