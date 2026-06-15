@@ -11,6 +11,7 @@ public enum WarehouseSortField {
     CODE("code"),
     NAME("name"),
     TYPE("type"),
+    BRANCH("branch"),
     CREATED_AT("createdAt");
 
     private final String property;

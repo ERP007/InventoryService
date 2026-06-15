@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.exception.BranchAlreadyAssignedException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseBranchRuleException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
@@ -29,7 +30,7 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForE
 class WarehouseServiceTest {
 
     private static WarehouseSummary summary(Long id, String code) {
-        return new WarehouseSummary(id, code, "서울 2창고", WarehouseType.DEALER, "서울 강남지점", true,
+        return new WarehouseSummary(id, code, "서울 2창고", WarehouseType.DEALER, "서울 강남지점", "서울 강남구", true,
                 Instant.parse("2026-05-28T14:30:00Z"), Instant.parse("2026-05-28T14:30:00Z"));
     }
 
@@ -128,6 +129,18 @@ class WarehouseServiceTest {
         assertThat(repository.savedWarehouse).isNull();
     }
 
+    @Test
+    void DEALER인데_소속지점이_이미_다른창고에_할당됐으면_BranchAlreadyAssignedException을_던지고_저장하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.branchAlreadyAssigned = true;
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.create(
+                new CreateWarehouseCommand("BR-SE-002", "서울 2창고", WarehouseType.DEALER, 3L, null)))
+                .isInstanceOf(BranchAlreadyAssignedException.class);
+        assertThat(repository.savedWarehouse).isNull();
+    }
+
     // ---- getByCode ----
 
     @Test
@@ -195,6 +208,18 @@ class WarehouseServiceTest {
         assertThat(repository.updateCodeArg).isNull();
     }
 
+    @Test
+    void update는_소속지점이_이미_다른창고에_할당됐으면_BranchAlreadyAssignedException을_던지고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.branchAlreadyAssigned = true;
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.update("BR-SE-001",
+                new UpdateWarehouseCommand("서울 1창고", WarehouseType.DEALER, 3L, null, 5L)))
+                .isInstanceOf(BranchAlreadyAssignedException.class);
+        assertThat(repository.updateCodeArg).isNull();
+    }
+
     // ---- changeActive ----
 
     private static WarehouseSummaryForEdit forEdit(boolean active, long version) {
@@ -244,6 +269,7 @@ class WarehouseServiceTest {
         private List<WarehouseHqSummary> hqSummaries = List.of();
         private WarehouseSearchQuery received;
         private boolean codeExists = false;
+        private boolean branchAlreadyAssigned = false;
         private Warehouse savedWarehouse;
         private WarehouseSummary summaryAfterSave;
         private WarehouseSummaryForEdit summaryForEdit;
@@ -272,6 +298,11 @@ class WarehouseServiceTest {
         @Override
         public boolean existsByCode(String code) {
             return codeExists;
+        }
+
+        @Override
+        public boolean existsByBranchIdExcludingCode(Long branchId, String excludeCode) {
+            return branchAlreadyAssigned;
         }
 
         @Override

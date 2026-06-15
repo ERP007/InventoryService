@@ -187,6 +187,43 @@ class WarehouseRepositoryAdapterTest {
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
+    @Test
+    void search는_창고_주소를_함께_반환한다() {
+        List<WarehouseSummary> result = adapter.search(WarehouseSearchQuery.of("hw-se-001", null, null, null));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).address()).isEqualTo("서울 어딘가");
+    }
+
+    @Test
+    void sort_branch는_소속지점명_오름차순으로_적용된다() {
+        insertBranch(20L, "부산 해운대지점");
+        insertWarehouse(5L, "BR-BU-001", "부산 해운대창고", "DEALER", 20L, true, "2024-07-01T09:00:00Z");
+
+        List<WarehouseSummary> result = adapter.search(WarehouseSearchQuery.of(null, "DEALER", null, "branch,asc"));
+
+        // 소속 지점명 오름차순(부산 < 서울). 서울 강남지점 2건(HW-SE-001/002)은 동률.
+        assertThat(result).extracting(WarehouseSummary::branchName)
+                .containsExactly("부산 해운대지점", "서울 강남지점", "서울 강남지점");
+    }
+
+    @Test
+    void existsByBranchIdExcludingCode_등록검사는_지점에_창고가_있으면_true_없으면_false다() {
+        // 서울 강남지점(10L)엔 창고가 있고, 999L엔 없다.
+        assertThat(adapter.existsByBranchIdExcludingCode(10L, null)).isTrue();
+        assertThat(adapter.existsByBranchIdExcludingCode(999L, null)).isFalse();
+    }
+
+    @Test
+    void existsByBranchIdExcludingCode_수정검사는_자기_창고를_제외하고_판정한다() {
+        insertBranch(20L, "부산 해운대지점");
+        insertWarehouse(5L, "BR-BU-001", "부산 해운대창고", "DEALER", 20L, true, "2024-07-01T09:00:00Z");
+
+        // 20L엔 BR-BU-001만 할당 → 자기 제외 시 false, 다른 코드 기준이면 true.
+        assertThat(adapter.existsByBranchIdExcludingCode(20L, "BR-BU-001")).isFalse();
+        assertThat(adapter.existsByBranchIdExcludingCode(20L, "OTHER")).isTrue();
+    }
+
     private void insertBranch(long id, String name) {
         entityManager().createNativeQuery("INSERT INTO branch_location (id, name) VALUES (?, ?)")
                 .setParameter(1, id)

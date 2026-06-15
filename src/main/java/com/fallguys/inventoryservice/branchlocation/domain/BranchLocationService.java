@@ -47,4 +47,15 @@ public class BranchLocationService {
     public List<BranchLocation> findAll() {
         return branchLocationRepository.findAll();
     }
+
+    /**
+     * 아직 어느 창고에도 할당되지 않은 지점 목록을 조회한다(창고 등록 모달의 소속 지점 드롭다운용).
+     * 소속 지점↔창고는 1:1이라 등록 시 미할당 지점만 선택할 수 있다.
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 미할당이 0건이면 빈 목록을 반환한다(404 아님).
+     */
+    @Transactional(readOnly = true)
+    public List<BranchLocation> findUnassigned() {
+        return branchLocationRepository.findUnassigned();
+    }
 }
