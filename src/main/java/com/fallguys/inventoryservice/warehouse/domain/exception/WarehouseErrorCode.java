@@ -13,7 +13,8 @@ public enum WarehouseErrorCode {
     WAREHOUSE_CODE_DUPLICATE("WAREHOUSE_CODE_DUPLICATE", "이미 존재하는 창고 코드입니다."),
     WAREHOUSE_NOT_FOUND("WAREHOUSE_NOT_FOUND", "창고를 찾을 수 없습니다."),
     WAREHOUSE_CODE_IMMUTABLE("WAREHOUSE_CODE_IMMUTABLE", "창고 코드는 변경할 수 없습니다."),
-    WAREHOUSE_INACTIVE("WAREHOUSE_INACTIVE", "비활성 창고로는 입출고할 수 없습니다.");
+    WAREHOUSE_INACTIVE("WAREHOUSE_INACTIVE", "비활성 창고로는 입출고할 수 없습니다."),
+    BRANCH_ALREADY_ASSIGNED("BRANCH_ALREADY_ASSIGNED", "이미 다른 창고에 할당된 소속 지점입니다.");
 
     private final String code;
     private final String defaultMessage;

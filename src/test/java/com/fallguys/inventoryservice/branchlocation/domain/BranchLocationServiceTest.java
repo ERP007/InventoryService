@@ -59,12 +59,27 @@ class BranchLocationServiceTest {
         assertThat(service.findAll()).isEmpty();
     }
 
+    @Test
+    void findUnassigned는_레포지토리의_미할당_지점목록을_그대로_반환한다() {
+        StubBranchLocationRepository repository = new StubBranchLocationRepository(false, 0L);
+        repository.unassignedResult = List.of(
+                BranchLocation.of(6L, "서울 금천지점1"),
+                BranchLocation.of(7L, "수원 영통지점"));
+        BranchLocationService service = new BranchLocationService(repository);
+
+        List<BranchLocation> result = service.findUnassigned();
+
+        assertThat(result).extracting(BranchLocation::getName)
+                .containsExactly("서울 금천지점1", "수원 영통지점");
+    }
+
     private static final class StubBranchLocationRepository implements BranchLocationRepository {
         private final boolean exists;
         private final long assignedId;
         private String existsByNameArg;
         private BranchLocation savedArg;
         private List<BranchLocation> findAllResult = List.of();
+        private List<BranchLocation> unassignedResult = List.of();
 
         private StubBranchLocationRepository(boolean exists, long assignedId) {
             this.exists = exists;
@@ -91,6 +106,11 @@ class BranchLocationServiceTest {
         @Override
         public List<BranchLocation> findAll() {
             return findAllResult;
+        }
+
+        @Override
+        public List<BranchLocation> findUnassigned() {
+            return unassignedResult;
         }
     }
 }

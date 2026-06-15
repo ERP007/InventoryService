@@ -18,4 +18,12 @@ public interface BranchLocationRepository {
 
     /** 전체 지점을 id 오름차순으로 반환한다. 없으면 빈 리스트. */
     List<BranchLocation> findAll();
+
+    /**
+     * 어느 창고에도 할당되지 않은 지점을 id 오름차순으로 반환한다(창고 등록용, 지점↔창고 1:1). 없으면 빈 리스트.
+     * 기본값 빈 리스트는 영속 구현체(BranchLocationRepositoryAdapter)가 반드시 override한다 — 이 조회와 무관한 테스트 stub의 보일러플레이트를 줄이기 위한 기본값일 뿐이다.
+     */
+    default List<BranchLocation> findUnassigned() {
+        return List.of();
+    }
 }

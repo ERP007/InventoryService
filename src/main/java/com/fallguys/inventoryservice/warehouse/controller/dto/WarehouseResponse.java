@@ -14,6 +14,7 @@ public record WarehouseResponse(
         String name,
         WarehouseType type,
         String branchName,
+        String address,
         boolean active,
         Instant createdAt,
         Instant updatedAt
@@ -26,6 +27,7 @@ public record WarehouseResponse(
                 summary.name(),
                 summary.type(),
                 summary.branchName(),
+                summary.address(),
                 summary.active(),
                 summary.createdAt(),
                 summary.updatedAt()

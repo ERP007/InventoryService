@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.exception.BranchAlreadyAssignedException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
@@ -67,15 +68,21 @@ public class WarehouseService {
      * 예외:
      * - 유형↔branchId 정합 위반: WarehouseBranchRuleException (400, 도메인 생성 시)
      * - 소속 지점 미존재: BranchNotFoundException (400)
+     * - 소속 지점 중복 할당(1:1 위반): BranchAlreadyAssignedException (409)
      * - 창고 코드 중복: WarehouseCodeDuplicateException (409)
      */
     @Transactional
     public WarehouseSummary create(CreateWarehouseCommand command) {
         Warehouse warehouse = Warehouse.create(command);
 
-        // branchId 가 없을 때
-        if (warehouse.getBranchId() != null && !branchLocationRepository.existsById(warehouse.getBranchId())) {
-            throw new BranchNotFoundException(warehouse.getBranchId());
+        // DEALER는 소속 지점이 (1) 실재하고 (2) 다른 창고에 아직 할당되지 않아야 한다(지점↔창고 1:1 매핑).
+        if (warehouse.getBranchId() != null) {
+            if (!branchLocationRepository.existsById(warehouse.getBranchId())) {
+                throw new BranchNotFoundException(warehouse.getBranchId());
+            }
+            if (warehouseRepository.existsByBranchIdExcludingCode(warehouse.getBranchId(), null)) {
+                throw new BranchAlreadyAssignedException(warehouse.getBranchId());
+            }
         }
 
         // WH 코드는 유일해야 한다
@@ -119,14 +126,21 @@ public class WarehouseService {
      * 예외:
      * - 유형↔branchId 정합 위반: WarehouseBranchRuleException (400)
      * - 소속 지점 미존재: BranchNotFoundException (400)
+     * - 소속 지점 중복 할당(1:1 위반): BranchAlreadyAssignedException (409)
      * - 창고 없음/소속 외: WarehouseNotFoundException (404)
      * - version 불일치(동시 수정): OptimisticLockConflictException (409)
      */
     @Transactional
     public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
         Warehouse.validateBranchRule(command.type(), command.branchId());
-        if (command.branchId() != null && !branchLocationRepository.existsById(command.branchId())) {
-            throw new BranchNotFoundException(command.branchId());
+        if (command.branchId() != null) {
+            if (!branchLocationRepository.existsById(command.branchId())) {
+                throw new BranchNotFoundException(command.branchId());
+            }
+            // 자기 자신을 제외하고 다른 창고가 같은 지점을 쓰면 1:1 위반.
+            if (warehouseRepository.existsByBranchIdExcludingCode(command.branchId(), code)) {
+                throw new BranchAlreadyAssignedException(command.branchId());
+            }
         }
         return warehouseRepository.update(code, command);
     }

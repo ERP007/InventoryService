@@ -62,4 +62,18 @@ public class BranchLocationController {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
         return ResponseEntity.ok(BranchLocationListResponse.from(branchLocationService.findAll()));
     }
+
+    /**
+     * 미할당 지점 목록을 조회한다. ADMIN·HQ_MANAGER만 호출 가능(그 외 Role은 403 FORBIDDEN).
+     * 창고 등록 모달의 소속 지점 드롭다운용 — 지점↔창고 1:1이라 아직 창고가 없는 지점만 반환한다. 0건이어도 200·빈 배열.
+     */
+    @Operation(
+            summary = "미할당 지점 목록 조회",
+            description = "어느 창고에도 할당되지 않은 소속 지점을 id 오름차순으로 반환한다(창고 등록용). 0건이면 빈 배열."
+    )
+    @GetMapping("/unassigned")
+    public ResponseEntity<BranchLocationListResponse> listUnassigned(@AuthenticationPrincipal Jwt jwt) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        return ResponseEntity.ok(BranchLocationListResponse.from(branchLocationService.findUnassigned()));
+    }
 }

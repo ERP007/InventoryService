@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
@@ -20,6 +21,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSort;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSortField;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,14 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     @Override
     public boolean existsByCode(String code) {
         return jpaDao.existsByCode(code);
+    }
+
+    @Override
+    public boolean existsByBranchIdExcludingCode(Long branchId, String excludeCode) {
+        // excludeCode가 null이면(등록) 전체 검사, 있으면(수정) 자기 창고를 제외하고 검사한다.
+        return excludeCode == null
+                ? jpaDao.existsByBranchId(branchId)
+                : jpaDao.existsByBranchIdAndCodeNot(branchId, excludeCode);
     }
 
     @Override
@@ -130,6 +140,10 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
         Sort.Direction direction = sort.direction() == SortDirection.DESC
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
+        // 소속 지점명(branch)은 조인 테이블(b) 속성이라 JpaSort.unsafe로 별칭(b.name)을 직접 지정한다.
+        if (sort.field() == WarehouseSortField.BRANCH) {
+            return JpaSort.unsafe(direction, "b.name");
+        }
         return Sort.by(direction, sort.field().property());
     }
 }

@@ -83,7 +83,7 @@ class WarehouseSearchQueryTest {
                 .isInstanceOfSatisfying(InvalidParameterException.class, ex ->
                         assertThat(ex.getDetails()).singleElement().satisfies(v -> {
                             assertThat(v.field()).isEqualTo("sort");
-                            assertThat(v.allowed()).containsExactly("code", "name", "type", "createdAt");
+                            assertThat(v.allowed()).containsExactly("code", "name", "type", "branch", "createdAt");
                         }));
     }
 

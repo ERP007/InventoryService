@@ -26,6 +26,15 @@ public interface WarehouseRepository {
     /** 창고 코드 존재 여부. 등록 전 중복 검사에 사용한다. */
     boolean existsByCode(String code);
 
+    /**
+     * 소속 지점에 할당된 (다른) 창고가 있는지 여부 — 지점↔창고 1:1 매핑 검증.
+     * excludeCode가 null이면 전체 검사(등록), 값이 있으면 그 창고를 제외하고 검사한다(수정 시 자기 제외).
+     * 기본값 false는 영속 구현체(WarehouseRepositoryAdapter)가 반드시 override한다 — 이 검증과 무관한 테스트 stub의 보일러플레이트를 줄이기 위한 기본값일 뿐이다.
+     */
+    default boolean existsByBranchIdExcludingCode(Long branchId, String excludeCode) {
+        return false;
+    }
+
     /** 신규 창고를 저장하고 발급된 식별자를 반환한다. */
     Long save(Warehouse warehouse);
 
