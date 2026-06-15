@@ -10,6 +10,7 @@ public record WarehouseStockResponse(
         Long warehouseId,
         String warehouseCode,
         String warehouseName,
+        boolean warehouseActive,
         int quantity,
         int safetyStock,
         StockStatus status
@@ -20,6 +21,7 @@ public record WarehouseStockResponse(
                 row.warehouseId(),
                 row.warehouseCode(),
                 row.warehouseName(),
+                row.warehouseActive(),
                 row.quantity(),
                 row.safetyStock(),
                 StockStatus.of(row.quantity(), row.safetyStock()));

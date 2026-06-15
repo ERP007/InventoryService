@@ -31,8 +31,8 @@ class StockSkuDetailServiceTest {
     void ADMIN은_전사범위로_조회하고_합계와_이력을_조립한다() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.rows = List.of(
-                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50),
-                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50, true),
+                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100, true));
         StubMovementRepository movementRepo = new StubMovementRepository();
         movementRepo.history = List.of(
                 new MovementHistory(MovementType.OUTBOUND, -18, "AD002", "홍길동", Instant.parse("2026-05-20T14:22:00Z")));
@@ -53,7 +53,7 @@ class StockSkuDetailServiceTest {
     @Test
     void BRANCH는_자기창고로_범위를_강제한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50));
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50, true));
         StubMovementRepository movementRepo = new StubMovementRepository();
         StockSkuDetailService service = new StockSkuDetailService(stockRepo, movementRepo, sku -> Optional.empty());
 
@@ -76,7 +76,7 @@ class StockSkuDetailServiceTest {
     @Test
     void Item에서_대분류_중분류를_받아_상세에_채운다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100, true));
         StockSkuDetailService service = new StockSkuDetailService(
                 stockRepo, new StubMovementRepository(),
                 sku -> Optional.of(new ItemInfo("엔진오일 필터", ItemUnit.EA, "엔진", "오일필터", 50)));
@@ -90,7 +90,7 @@ class StockSkuDetailServiceTest {
     @Test
     void Item카테고리가_없으면_대분류_중분류는_null() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100, true));
         StockSkuDetailService service = new StockSkuDetailService(
                 stockRepo, new StubMovementRepository(), sku -> Optional.empty());
 
@@ -103,7 +103,7 @@ class StockSkuDetailServiceTest {
     @Test
     void Item호출이_실패하면_대분류_중분류를_null로_강등한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+        stockRepo.rows = List.of(new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100, true));
         StockSkuDetailService service = new StockSkuDetailService(
                 stockRepo, new StubMovementRepository(),
                 sku -> { throw new ItemServiceUnavailableException("stub 실패", new RuntimeException()); });

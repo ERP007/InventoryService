@@ -35,7 +35,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
      */
     @Query(value = """
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSummary(
-                s.id, s.sku, s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, s.updatedAt)
+                s.id, s.sku, s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, s.updatedAt, w.active)
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
             WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
@@ -117,7 +117,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockSkuRow(
-                s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock)
+                s.itemName, s.itemUnit, s.warehouseId, w.code, w.name, s.currentStock, s.safetyStock, w.active)
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
             WHERE s.sku = :sku
@@ -132,6 +132,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
     /**
      * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.
      * COUNT(CASE …)로 부족(0&lt;현재고&lt;안전)·무재고(현재고=0)를 세어 결과가 없어도 null 없이 0을 반환한다.
+     * 비활성(active=false) 창고의 재고는 집계에서 제외한다(KPI는 운영 중 창고만 반영).
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockStatusCount(
@@ -140,7 +141,8 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
                 COUNT(CASE WHEN s.currentStock = 0 THEN 1 END))
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
-            WHERE (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            WHERE w.active = true
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
             """)
     StockStatusCount countByStatus(
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,

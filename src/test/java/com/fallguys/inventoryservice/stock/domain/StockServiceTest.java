@@ -29,6 +29,7 @@ import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseInactiveException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
@@ -222,6 +223,28 @@ class StockServiceTest {
     }
 
     @Test
+    void create_비활성_창고면_WarehouseInactiveException을_던지고_저장하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L, false), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.create(
+                new CreateStockCommand("HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, "WH-SE-001", 100, 50)))
+                .isInstanceOf(WarehouseInactiveException.class);
+        assertThat(stockRepository.saved).isNull();
+    }
+
+    @Test
+    void updateSafetyStock_비활성_창고면_WarehouseInactiveException을_던지고_위임하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L, false), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 60, 3L)))
+                .isInstanceOf(WarehouseInactiveException.class);
+        assertThat(stockRepository.safetyUpdated).isFalse();
+    }
+
+    @Test
     void getStockQuantities_창고가_있으면_재고수량_리스트를_반환한다() {
         StubStockRepository stockRepository = new StubStockRepository();
         stockRepository.quantities = List.of(
@@ -249,6 +272,7 @@ class StockServiceTest {
 
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
+        private boolean safetyUpdated = false;
         private SafetyStockEdit safetyEdit;
         private Stock saved;
         private Long savedWarehouseId;
@@ -326,6 +350,7 @@ class StockServiceTest {
 
         @Override
         public SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command) {
+            this.safetyUpdated = true;
             return new SafetyStockEdit(command.sku(), command.warehouseCode(), "엔진오일 필터", ItemUnit.EA,
                     120, command.safetyStock(), command.version() + 1);
         }
@@ -333,9 +358,15 @@ class StockServiceTest {
 
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final Long warehouseId; // null이면 미존재
+        private final boolean active;
 
         private StubWarehouseRepository(Long warehouseId) {
+            this(warehouseId, true);
+        }
+
+        private StubWarehouseRepository(Long warehouseId, boolean active) {
             this.warehouseId = warehouseId;
+            this.active = active;
         }
 
         @Override
@@ -344,7 +375,7 @@ class StockServiceTest {
                 return Optional.empty();
             }
             return Optional.of(new WarehouseSummaryForEdit(
-                    warehouseId, code, "창고", WarehouseType.DEALER, 3L, "지점", "주소", true,
+                    warehouseId, code, "창고", WarehouseType.DEALER, 3L, "지점", "주소", active,
                     Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2024-01-01T00:00:00Z"), 0L));
         }
 

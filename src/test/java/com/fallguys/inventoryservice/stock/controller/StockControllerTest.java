@@ -518,8 +518,9 @@ class StockControllerTest {
 
         @Bean
         StockAdjustmentService stockAdjustmentService(StockRepository stockRepository,
-                                                      StockMovementRepository stockMovementRepository) {
-            return new StockAdjustmentService(stockRepository, stockMovementRepository);
+                                                      StockMovementRepository stockMovementRepository,
+                                                      WarehouseRepository warehouseRepository) {
+            return new StockAdjustmentService(stockRepository, stockMovementRepository, warehouseRepository);
         }
 
         @Bean
@@ -531,7 +532,7 @@ class StockControllerTest {
                 public StockSummaryPage search(StockSearchQuery query) {
                     StockSummary item = new StockSummary(
                             1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고",
-                            48, 50, Instant.parse("2026-05-20T14:22:00Z"));
+                            48, 50, Instant.parse("2026-05-20T14:22:00Z"), true);
                     return new StockSummaryPage(List.of(item), query.page(), query.size(), 42, 3);
                 }
 
@@ -570,8 +571,8 @@ class StockControllerTest {
                 public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
                     if ("HMC-EN-00214".equals(sku)) {
                         return List.of(
-                                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50),
-                                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100));
+                                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고", 48, 50, true),
+                                new StockSkuRow("엔진오일 필터", ItemUnit.EA, 1L, "HQ-001", "본사", 100, 100, true));
                     }
                     return List.of();
                 }
@@ -663,7 +664,8 @@ class StockControllerTest {
             return new WarehouseRepository() {
                 @Override
                 public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
-                    if (!"WH-SE-001".equals(code)) {
+                    // 조정 테스트는 WH-SE-002, 생성·안전재고 테스트는 WH-SE-001을 쓴다(둘 다 활성).
+                    if (!"WH-SE-001".equals(code) && !"WH-SE-002".equals(code)) {
                         return Optional.empty();
                     }
                     return Optional.of(new WarehouseSummaryForEdit(

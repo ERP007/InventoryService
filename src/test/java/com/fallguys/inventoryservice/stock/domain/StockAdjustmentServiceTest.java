@@ -24,6 +24,16 @@ import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
+import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
+import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
+import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
+import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseInactiveException;
+import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
 class StockAdjustmentServiceTest {
 
@@ -37,7 +47,7 @@ class StockAdjustmentServiceTest {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
         StubMovementRepository movementRepo = new StubMovementRepository();
-        StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo);
+        StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo, new StubWarehouseRepository());
 
         StockAdjustmentResult result = service.adjust(command(AdjustmentType.DECREASE, 3));
 
@@ -61,7 +71,7 @@ class StockAdjustmentServiceTest {
     void ADJUST는_실측값으로_보정한다() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
-        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository());
+        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository(), new StubWarehouseRepository());
 
         StockAdjustmentResult result = service.adjust(command(AdjustmentType.ADJUST, 40));
 
@@ -73,7 +83,7 @@ class StockAdjustmentServiceTest {
     void 재고가_없으면_StockNotFoundException() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.stock = null;
-        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository());
+        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository(), new StubWarehouseRepository());
 
         assertThatThrownBy(() -> service.adjust(command(AdjustmentType.DECREASE, 3)))
                 .isInstanceOf(StockNotFoundException.class);
@@ -84,7 +94,7 @@ class StockAdjustmentServiceTest {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
         StubMovementRepository movementRepo = new StubMovementRepository();
-        StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo);
+        StockAdjustmentService service = new StockAdjustmentService(stockRepo, movementRepo, new StubWarehouseRepository());
 
         assertThatThrownBy(() -> service.adjust(command(AdjustmentType.DECREASE, 100)))
                 .isInstanceOf(InsufficientStockException.class);
@@ -95,10 +105,24 @@ class StockAdjustmentServiceTest {
     void 변동이_없으면_NoStockChangeException() {
         StubStockRepository stockRepo = new StubStockRepository();
         stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 50, 50);
-        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository());
+        StockAdjustmentService service = new StockAdjustmentService(stockRepo, new StubMovementRepository(), new StubWarehouseRepository());
 
         assertThatThrownBy(() -> service.adjust(command(AdjustmentType.ADJUST, 50)))
                 .isInstanceOf(NoStockChangeException.class);
+    }
+
+    @Test
+    void 비활성_창고면_WarehouseInactiveException이고_저장하지_않는다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
+        StubMovementRepository movementRepo = new StubMovementRepository();
+        StockAdjustmentService service =
+                new StockAdjustmentService(stockRepo, movementRepo, new StubWarehouseRepository(false));
+
+        assertThatThrownBy(() -> service.adjust(command(AdjustmentType.DECREASE, 3)))
+                .isInstanceOf(WarehouseInactiveException.class);
+        assertThat(stockRepo.savedQuantity).isNull();
+        assertThat(movementRepo.saved).isNull();
     }
 
     private static final class StubStockRepository implements StockRepository {
@@ -207,6 +231,60 @@ class StockAdjustmentServiceTest {
         @Override
         public long countRecent(List<String> warehouseCodes, Instant since) {
             return 0;
+        }
+    }
+
+    private static final class StubWarehouseRepository implements WarehouseRepository {
+        private final boolean active;
+
+        private StubWarehouseRepository() {
+            this(true);
+        }
+
+        private StubWarehouseRepository(boolean active) {
+            this.active = active;
+        }
+
+        @Override
+        public Optional<WarehouseSummaryForEdit> findForEditByCode(String code) {
+            return Optional.of(new WarehouseSummaryForEdit(
+                    2L, code, "창고", WarehouseType.DEALER, 3L, "지점", "주소", active,
+                    Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2024-01-01T00:00:00Z"), 0L));
+        }
+
+        @Override
+        public List<WarehouseSummary> search(WarehouseSearchQuery query) {
+            return List.of();
+        }
+
+        @Override
+        public List<WarehouseHqSummary> findActiveHq() {
+            return List.of();
+        }
+
+        @Override
+        public boolean existsByCode(String code) {
+            return true;
+        }
+
+        @Override
+        public Long save(Warehouse warehouse) {
+            return null;
+        }
+
+        @Override
+        public Optional<WarehouseSummary> findSummaryById(Long id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public WarehouseSummaryForEdit update(String code, UpdateWarehouseCommand command) {
+            return null;
+        }
+
+        @Override
+        public WarehouseSummaryForEdit changeActive(String code, ChangeWarehouseActiveCommand command) {
+            return null;
         }
     }
 }

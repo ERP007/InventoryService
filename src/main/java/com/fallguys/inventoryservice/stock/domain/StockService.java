@@ -20,6 +20,7 @@ import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
 import com.fallguys.inventoryservice.stock.domain.query.WarehouseStockQuery;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseInactiveException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
 
@@ -114,24 +115,28 @@ public class StockService {
      * (sku × warehouse) 재고 행을 신규 생성한다. 입출고 흐름 밖의 초기 데이터 적재·개발 검증용(ADMIN 전용).
      *
      * 흐름:
-     * 1) warehouseCode로 실제 창고 id를 해석한다(없으면 404 — 존재 은닉).
+     * 1) warehouseCode로 창고를 조회한다 — 없으면 404(존재 은닉), 비활성이면 400(비활성 창고엔 재고를 만들 수 없다).
      * 2) (sku × warehouseId) 중복 여부를 확인한다(이미 있으면 409, 조정을 사용해야 함).
      * 3) 도메인 모델로 재고를 생성한다(수량·안전재고 ≥ 0 불변식은 도메인이 검증).
      * 4) 저장 후 창고 코드를 조인한 생성 결과를 재조회해 반환한다.
      * 초기 적재는 이동 이력(StockMovement)을 남기지 않는다 — 입출고 흐름 밖이며, 누가/언제는 stock 감사 컬럼(created_by/created_at)으로 충분하다.
      *
-     * 트랜잭션: 쓰기. 창고 미존재·중복은 저장 이전에 중단되어 아무것도 저장되지 않는다.
+     * 트랜잭션: 쓰기. 창고 미존재·비활성·중복은 저장 이전에 중단되어 아무것도 저장되지 않는다.
      * (지금은 sku의 Item 마스터 존재 검증을 하지 않는다 — 사용자가 모든 필드를 직접 입력하는 단순 적재.)
      *
      * 예외:
      * - 창고 없음: WarehouseNotFoundException (404)
+     * - 비활성 창고: WarehouseInactiveException (400)
      * - 재고 중복: StockAlreadyExistsException (409)
      */
     @Transactional
     public StockCreateResult create(CreateStockCommand command) {
-        Long warehouseId = warehouseRepository.findForEditByCode(command.warehouseCode())
-                .map(WarehouseSummaryForEdit::id)
+        WarehouseSummaryForEdit warehouse = warehouseRepository.findForEditByCode(command.warehouseCode())
                 .orElseThrow(() -> new WarehouseNotFoundException(command.warehouseCode()));
+        if (!warehouse.active()) {
+            throw new WarehouseInactiveException(command.warehouseCode());
+        }
+        Long warehouseId = warehouse.id();
 
         if (stockRepository.existsBySkuAndWarehouseId(command.sku(), warehouseId)) {
             throw new StockAlreadyExistsException(command.sku(), command.warehouseCode());
@@ -163,17 +168,25 @@ public class StockService {
 
     /**
      * 안전재고를 절대값으로 수정한다(ADMIN·HQ_MANAGER 전용; 인가는 컨트롤러). version으로 낙관적 락을 검증한다.
+     * 비활성 창고의 재고는 안전재고도 수정할 수 없다(비활성 창고는 조회만 허용) — 창고가 비활성이면 400으로 막은 뒤 위임한다.
      * 현재고·이동 이력은 건드리지 않는다(안전재고는 수량 이동이 아니라 임계값 설정이라 StockMovement를 남기지 않는다 —
      * 변경 이력은 stock 행의 감사 컬럼 updated_by/updated_at으로 추적). 행 미존재(404)·version 충돌(409)은 영속 계층이 판정한다.
      *
      * 트랜잭션: 쓰기. 실패 시 변경 없이 롤백된다.
      *
      * 예외:
+     * - 비활성 창고: WarehouseInactiveException (400)
      * - 재고 행 없음: StockNotFoundException (404)
      * - version 불일치(동시 수정): OptimisticLockConflictException (409)
      */
     @Transactional
     public SafetyStockEdit updateSafetyStock(UpdateSafetyStockCommand command) {
+        // 비활성 창고의 재고는 수정할 수 없다. 창고가 있으면서 비활성일 때만 막고, 행 미존재(404)는 영속 계층이 판정한다.
+        warehouseRepository.findForEditByCode(command.warehouseCode())
+                .filter(warehouse -> !warehouse.active())
+                .ifPresent(warehouse -> {
+                    throw new WarehouseInactiveException(command.warehouseCode());
+                });
         return stockRepository.updateSafetyStock(command);
     }
 }

@@ -252,6 +252,51 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void countByStatus_비활성_창고의_재고는_집계에서_제외한다() {
+        seedStocks(); // 활성 창고(2L, 5L)에 4건
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 10, 50); // 비활성 창고 재고(집계 제외 대상)
+
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isEqualTo(4); // 비활성 창고 9L의 1건은 제외된다
+    }
+
+    @Test
+    void search는_비활성_창고_재고도_조회하되_warehouseActive로_구분한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);  // 활성 창고
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);   // 비활성 창고
+
+        StockSummaryPage page = adapter.search(
+                query(null, List.of(), null, StockSortField.NAME, SortDirection.ASC, 1, 20));
+
+        assertThat(page.totalElements()).isEqualTo(2); // 비활성 창고 재고도 목록에 노출(A3)
+        StockSummary active = page.content().stream()
+                .filter(s -> s.warehouseCode().equals("WH-SE-001")).findFirst().orElseThrow();
+        StockSummary inactive = page.content().stream()
+                .filter(s -> s.warehouseCode().equals("WH-OLD-001")).findFirst().orElseThrow();
+        assertThat(active.warehouseActive()).isTrue();
+        assertThat(inactive.warehouseActive()).isFalse();
+    }
+
+    @Test
+    void findSkuWarehouseStocks는_창고의_활성여부를_함께_투영한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);
+
+        List<StockSkuRow> rows = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of());
+
+        StockSkuRow active = rows.stream()
+                .filter(r -> r.warehouseCode().equals("WH-SE-001")).findFirst().orElseThrow();
+        StockSkuRow inactive = rows.stream()
+                .filter(r -> r.warehouseCode().equals("WH-OLD-001")).findFirst().orElseThrow();
+        assertThat(active.warehouseActive()).isTrue();
+        assertThat(inactive.warehouseActive()).isFalse();
+    }
+
+    @Test
     void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
         seedStocks();
 
@@ -394,6 +439,10 @@ class StockRepositoryAdapterTest {
     }
 
     private void insertWarehouse(long id, String code, String name) {
+        insertWarehouse(id, code, name, true);
+    }
+
+    private void insertWarehouse(long id, String code, String name, boolean active) {
         entityManager().createNativeQuery("""
                         INSERT INTO warehouse
                             (id, code, name, type, branch_id, address, active,
@@ -406,7 +455,7 @@ class StockRepositoryAdapterTest {
                 .setParameter(4, "HQ")
                 .setParameter(5, null)
                 .setParameter(6, "주소")
-                .setParameter(7, true)
+                .setParameter(7, active)
                 .setParameter(8, "EMP-001")
                 .setParameter(9, "EMP-001")
                 .setParameter(10, Instant.parse("2024-01-01T00:00:00Z"))
