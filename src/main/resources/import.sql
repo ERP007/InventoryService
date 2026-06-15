@@ -46,6 +46,14 @@ INSERT INTO stock (sku, item_name, item_unit, warehouse_id, current_stock, safet
  ('HMC-TR-00111','변속기오일',     'L',  (SELECT id FROM warehouse WHERE code='WH-SE-002'), 60, 45, 'HMC2002','HMC2002','2026-05-16T11:00:00+09','2026-06-04T11:00:00+09',0),
  ('HMC-CL-00222','클러치 디스크',  'EA', (SELECT id FROM warehouse WHERE code='WH-SE-002'), 80, 25, 'HMC2002','HMC2002','2026-05-16T11:00:00+09','2026-05-16T11:00:00+09',0);
 
+-- 3-1) (데모) 비활성 창고(WH-BS-001) 재고 — 재고 조회에서 부품명·코드가 흐리게 표시되는 케이스. item_active는 컬럼 기본값(true).
+INSERT INTO stock (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock, created_by, updated_by, created_at, updated_at, version) VALUES
+ ('HMC-EN-00214','엔진오일 필터','EA', (SELECT id FROM warehouse WHERE code='WH-BS-001'), 45, 50, 'admin001','HMC1001','2026-05-15T11:00:00+09','2026-05-15T11:00:00+09',0),
+ ('HMC-BT-00901','배터리',       'EA', (SELECT id FROM warehouse WHERE code='WH-BS-001'), 20, 20, 'admin001','HMC1001','2026-05-15T11:00:00+09','2026-05-15T11:00:00+09',0);
+
+-- 3-2) (데모) 비활성 아이템(SKU) — 재고 조회에서 '비활성화'로 표시되고 조정·입출고가 막히는 케이스(추후 internal sync API가 갱신할 값).
+UPDATE stock SET item_active = false WHERE sku = 'HMC-CL-00222';
+
 -- 4) 이동 이력(stock_movement). item_name·item_unit·executor_name은 변동 당시 스냅샷.
 --    각 SO 라인 = 본사 OUTBOUND(-) + 지점 INBOUND(+). reason은 SO 흐름이라 NULL, note도 NULL.
 --    executor_name: HMC1001=김본사 / HMC2001=이강남 / HMC2002=박송파 (데모 값).

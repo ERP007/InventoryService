@@ -3,6 +3,7 @@ package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 import java.time.Instant;
 
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.ColumnDefault;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -63,6 +64,11 @@ public class StockEntity {
     @Column(name = "safety_stock", nullable = false)
     private int safetyStock;
 
+    // 아이템(SKU) 활성 여부를 stock에 반정규화. 비활성 전환은 추후 internal sync API가 갱신한다(신규 행은 true로 시작).
+    @ColumnDefault("true")
+    @Column(name = "item_active", nullable = false)
+    private boolean itemActive;
+
     @CreatedBy
     @Column(name = "created_by", updatable = false)
     private String createdBy;
@@ -82,24 +88,26 @@ public class StockEntity {
     @Version
     private Long version;
 
-    private StockEntity(String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int currentStock, int safetyStock) {
+    private StockEntity(String sku, String itemName, ItemUnit itemUnit, Long warehouseId,
+                        int currentStock, int safetyStock, boolean itemActive) {
         this.sku = sku;
         this.itemName = itemName;
         this.itemUnit = itemUnit;
         this.warehouseId = warehouseId;
         this.currentStock = currentStock;
         this.safetyStock = safetyStock;
+        this.itemActive = itemActive;
     }
 
     /** 신규 재고 도메인을 영속 엔티티로 변환한다(id·감사 컬럼·version은 JPA/Auditing이 채운다). */
     public static StockEntity from(Stock stock) {
         return new StockEntity(stock.getSku(), stock.getItemName(), stock.getItemUnit(), stock.getWarehouseId(),
-                stock.getQuantity(), stock.getSafetyStock());
+                stock.getQuantity(), stock.getSafetyStock(), stock.isItemActive());
     }
 
     /** 영속 엔티티를 도메인 모델로 변환한다(조회). */
     public Stock toDomain() {
-        return Stock.of(id, sku, itemName, itemUnit, warehouseId, currentStock, safetyStock);
+        return Stock.of(id, sku, itemName, itemUnit, warehouseId, currentStock, safetyStock, itemActive);
     }
 
     /** 조정 등으로 변동한 재고 수준(현재고·안전재고)을 도메인 상태로 동기화한다. id·sku·창고·감사 컬럼·version은 건드리지 않는다. */
