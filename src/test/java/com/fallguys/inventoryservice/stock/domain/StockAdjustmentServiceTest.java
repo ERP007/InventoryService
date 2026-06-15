@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.stock.domain.command.AdjustStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.InsufficientStockException;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.NoStockChangeException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
@@ -121,6 +122,20 @@ class StockAdjustmentServiceTest {
 
         assertThatThrownBy(() -> service.adjust(command(AdjustmentType.DECREASE, 3)))
                 .isInstanceOf(WarehouseInactiveException.class);
+        assertThat(stockRepo.savedQuantity).isNull();
+        assertThat(movementRepo.saved).isNull();
+    }
+
+    @Test
+    void 비활성_아이템이면_ItemInactiveException이고_저장하지_않는다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50, false);
+        StubMovementRepository movementRepo = new StubMovementRepository();
+        StockAdjustmentService service =
+                new StockAdjustmentService(stockRepo, movementRepo, new StubWarehouseRepository());
+
+        assertThatThrownBy(() -> service.adjust(command(AdjustmentType.DECREASE, 3)))
+                .isInstanceOf(ItemInactiveException.class);
         assertThat(stockRepo.savedQuantity).isNull();
         assertThat(movementRepo.saved).isNull();
     }

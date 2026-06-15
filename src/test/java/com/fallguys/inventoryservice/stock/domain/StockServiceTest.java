@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
@@ -245,6 +246,18 @@ class StockServiceTest {
     }
 
     @Test
+    void updateSafetyStock_비활성_아이템이면_ItemInactiveException을_던지고_위임하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        stockRepository.skuStock = Stock.of(1L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 120, 50, false);
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.updateSafetyStock(
+                new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 60, 3L)))
+                .isInstanceOf(ItemInactiveException.class);
+        assertThat(stockRepository.safetyUpdated).isFalse();
+    }
+
+    @Test
     void getStockQuantities_창고가_있으면_재고수량_리스트를_반환한다() {
         StubStockRepository stockRepository = new StubStockRepository();
         stockRepository.quantities = List.of(
@@ -274,6 +287,7 @@ class StockServiceTest {
         private boolean exists = false;
         private boolean safetyUpdated = false;
         private SafetyStockEdit safetyEdit;
+        private Stock skuStock; // findBySkuAndWarehouseCode 반환값(아이템 활성 검증용). null이면 빈 결과.
         private Stock saved;
         private Long savedWarehouseId;
         private StockSearchQuery searchArg;
@@ -335,7 +349,7 @@ class StockServiceTest {
 
         @Override
         public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
-            return Optional.empty();
+            return Optional.ofNullable(skuStock);
         }
 
         @Override

@@ -25,8 +25,9 @@ public class Stock {
     private final Long warehouseId;
     private int quantity;
     private final int safetyStock;
+    private final boolean itemActive;
 
-    private Stock(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
+    private Stock(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock, boolean itemActive) {
         if (sku == null || sku.isBlank()) {
             throw new IllegalArgumentException("sku는 필수입니다.");
         }
@@ -52,16 +53,22 @@ public class Stock {
         this.warehouseId = warehouseId;
         this.quantity = quantity;
         this.safetyStock = safetyStock;
+        this.itemActive = itemActive;
     }
 
-    /** 신규 재고를 생성한다. id는 영속 시 발급된다. */
+    /** 신규 재고를 생성한다. id는 영속 시 발급되며 아이템은 활성(true)으로 시작한다(비활성 전환은 별도 동기화). */
     public static Stock create(String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
-        return new Stock(null, sku, itemName, itemUnit, warehouseId, quantity, safetyStock);
+        return new Stock(null, sku, itemName, itemUnit, warehouseId, quantity, safetyStock, true);
     }
 
-    /** 영속 엔티티에서 도메인 모델을 복원한다(조회용). */
+    /** 영속 엔티티에서 도메인 모델을 복원한다(조회용). 아이템 활성 여부를 지정하지 않으면 활성(true)으로 본다. */
     public static Stock of(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock) {
-        return new Stock(id, sku, itemName, itemUnit, warehouseId, quantity, safetyStock);
+        return of(id, sku, itemName, itemUnit, warehouseId, quantity, safetyStock, true);
+    }
+
+    /** 영속 엔티티에서 도메인 모델을 복원한다(조회용, 아이템 활성 여부 포함). */
+    public static Stock of(Long id, String sku, String itemName, ItemUnit itemUnit, Long warehouseId, int quantity, int safetyStock, boolean itemActive) {
+        return new Stock(id, sku, itemName, itemUnit, warehouseId, quantity, safetyStock, itemActive);
     }
 
     /** 현재고·안전재고로부터 재고 상태를 파생한다. */

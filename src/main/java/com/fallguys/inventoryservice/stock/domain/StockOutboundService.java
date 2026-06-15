@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fallguys.inventoryservice.stock.domain.command.OutboundCommand;
 import com.fallguys.inventoryservice.stock.domain.command.OutboundLine;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundResult;
@@ -46,6 +47,7 @@ public class StockOutboundService {
      * - 창고 없음: WarehouseNotFoundException (404)
      * - 비활성 창고: WarehouseInactiveException (400)
      * - 재고 행 없음(신규 생성 미지원): StockNotFoundException (404)
+     * - 비활성 부품: ItemInactiveException (400)
      * - 가용재고 초과 차감: InsufficientStockException (409)
      * - 잠금 대기 초과: PessimisticLockingFailureException → LOCK_TIMEOUT (409, 핸들러 매핑)
      */
@@ -69,6 +71,10 @@ public class StockOutboundService {
         for (OutboundLine line : command.lines()) {
             Stock stock = stockRepository.findBySkuAndWarehouseIdForUpdate(line.sku(), warehouseId)
                     .orElseThrow(() -> new StockNotFoundException(command.warehouseCode(), line.sku()));
+            // 비활성 부품(SKU)은 출고할 수 없다(아이템 활성 여부는 stock에 반정규화).
+            if (!stock.isItemActive()) {
+                throw new ItemInactiveException(line.sku());
+            }
             int delta = stock.decrease(line.quantity());
             stockRepository.save(stock);
             StockMovement movement = StockMovement.createOutbound(

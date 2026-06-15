@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailableException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
@@ -113,6 +114,18 @@ class StockSkuDetailServiceTest {
         assertThat(detail.majorCategory()).isNull();
         assertThat(detail.middleCategory()).isNull();
         assertThat(detail.itemName()).isEqualTo("엔진오일 필터"); // 패널 자체는 정상 반환(강등만)
+    }
+
+    @Test
+    void 비활성_아이템이면_ItemInactiveException() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.rows = List.of(
+                new StockSkuRow("클러치 디스크", ItemUnit.EA, 1L, "HQ-001", "본사", 80, 25, false));
+        StockSkuDetailService service = new StockSkuDetailService(
+                stockRepo, new StubMovementRepository(), sku -> Optional.empty());
+
+        assertThatThrownBy(() -> service.getSkuDetail("HMC-CL-00222", TenancyType.ADMIN, null))
+                .isInstanceOf(ItemInactiveException.class);
     }
 
     private static final class StubStockRepository implements StockRepository {

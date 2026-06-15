@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
@@ -168,7 +169,7 @@ public class StockService {
 
     /**
      * 안전재고를 절대값으로 수정한다(ADMIN·HQ_MANAGER 전용; 인가는 컨트롤러). version으로 낙관적 락을 검증한다.
-     * 비활성 창고의 재고는 안전재고도 수정할 수 없다(비활성 창고는 조회만 허용) — 창고가 비활성이면 400으로 막은 뒤 위임한다.
+     * 비활성 창고·비활성 부품(SKU)의 재고는 안전재고도 수정할 수 없다(비활성은 조회만 허용) — 비활성이면 400으로 막은 뒤 위임한다.
      * 현재고·이동 이력은 건드리지 않는다(안전재고는 수량 이동이 아니라 임계값 설정이라 StockMovement를 남기지 않는다 —
      * 변경 이력은 stock 행의 감사 컬럼 updated_by/updated_at으로 추적). 행 미존재(404)·version 충돌(409)은 영속 계층이 판정한다.
      *
@@ -176,6 +177,7 @@ public class StockService {
      *
      * 예외:
      * - 비활성 창고: WarehouseInactiveException (400)
+     * - 비활성 부품: ItemInactiveException (400)
      * - 재고 행 없음: StockNotFoundException (404)
      * - version 불일치(동시 수정): OptimisticLockConflictException (409)
      */
@@ -186,6 +188,12 @@ public class StockService {
                 .filter(warehouse -> !warehouse.active())
                 .ifPresent(warehouse -> {
                     throw new WarehouseInactiveException(command.warehouseCode());
+                });
+        // 비활성 부품(SKU)의 재고도 수정할 수 없다. 재고 행이 있을 때만 검사하고, 행 미존재(404)는 영속 계층이 판정한다.
+        stockRepository.findBySkuAndWarehouseCode(command.sku(), command.warehouseCode())
+                .filter(stock -> !stock.isItemActive())
+                .ifPresent(stock -> {
+                    throw new ItemInactiveException(command.sku());
                 });
         return stockRepository.updateSafetyStock(command);
     }

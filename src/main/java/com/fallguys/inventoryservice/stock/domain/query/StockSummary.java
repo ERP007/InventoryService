@@ -20,6 +20,7 @@ public record StockSummary(
         int quantity,
         int safetyStock,
         Instant lastAdjustedAt,
-        boolean warehouseActive
+        boolean warehouseActive,
+        boolean itemActive
 ) {
 }

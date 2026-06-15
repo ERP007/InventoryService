@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fallguys.inventoryservice.stock.domain.command.AdjustStockCommand;
+import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.StockAdjustmentResult;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
@@ -27,7 +28,7 @@ public class StockAdjustmentService {
      *
      * 흐름:
      * 1) (sku × warehouseCode) 재고를 조회한다. 없으면 404(StockNotFoundException) — 모든 유형 공통.
-     * 2) 창고가 비활성이면 400(WarehouseInactiveException)으로 막는다(비활성 창고는 조회만 허용, 수정 불가).
+     * 2) 창고 또는 부품(SKU)이 비활성이면 400으로 막는다(비활성은 조회만 허용, 수정 불가).
      * 3) 도메인이 변동량을 계산·반영한다(INCREASE +, DECREASE -, ADJUST 실측-현재고).
      *    변동이 0이면 NO_STOCK_CHANGE(400), 차감 결과가 음수면 INSUFFICIENT_STOCK(409)로 거부한다.
      * 4) 변경된 재고를 저장하고(같은 영속 컨텍스트의 엔티티에 반영 → @Version 낙관락 적용),
@@ -39,6 +40,7 @@ public class StockAdjustmentService {
      * 예외:
      * - 재고 없음: StockNotFoundException (404)
      * - 비활성 창고: WarehouseInactiveException (400)
+     * - 비활성 부품: ItemInactiveException (400)
      * - 변동 없음(주로 실측=현재고): NoStockChangeException (400)
      * - 차감량 > 가용재고: InsufficientStockException (409)
      */
@@ -52,6 +54,10 @@ public class StockAdjustmentService {
                 .orElseThrow(() -> new WarehouseNotFoundException(command.warehouseCode()));
         if (!warehouse.active()) {
             throw new WarehouseInactiveException(command.warehouseCode());
+        }
+        // 비활성 부품(SKU)의 재고도 조정할 수 없다(아이템 활성 여부는 stock에 반정규화).
+        if (!stock.isItemActive()) {
+            throw new ItemInactiveException(command.sku());
         }
 
         int previousQuantity = stock.getQuantity();

@@ -281,19 +281,16 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
-    void findSkuWarehouseStocks는_창고의_활성여부를_함께_투영한다() {
+    void findSkuWarehouseStocks는_비활성_창고_행을_제외한다() {
         insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
-        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);
-        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);  // 활성 창고
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);   // 비활성 창고
 
         List<StockSkuRow> rows = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of());
 
-        StockSkuRow active = rows.stream()
-                .filter(r -> r.warehouseCode().equals("WH-SE-001")).findFirst().orElseThrow();
-        StockSkuRow inactive = rows.stream()
-                .filter(r -> r.warehouseCode().equals("WH-OLD-001")).findFirst().orElseThrow();
-        assertThat(active.warehouseActive()).isTrue();
-        assertThat(inactive.warehouseActive()).isFalse();
+        // 상세 패널은 활성 창고만 노출한다(비활성 창고 행 제외).
+        assertThat(rows).extracting(StockSkuRow::warehouseCode).containsExactly("WH-SE-001");
+        assertThat(rows).allMatch(StockSkuRow::itemActive); // itemActive 투영 확인
     }
 
     @Test
@@ -405,6 +402,33 @@ class StockRepositoryAdapterTest {
                 .isInstanceOf(StockNotFoundException.class);
     }
 
+    @Test
+    void countByStatus_비활성_아이템의_재고는_집계에서_제외한다() {
+        seedStocks(); // 활성 4건
+        insertStock("HMC-CL-00222", "클러치 디스크", 2L, 10, 50, false); // 비활성 아이템
+
+        StockStatusCount counts = adapter.countByStatus(List.of());
+
+        assertThat(counts.total()).isEqualTo(4); // 비활성 아이템 1건은 제외된다
+    }
+
+    @Test
+    void search는_비활성_아이템_재고도_조회하되_itemActive로_구분한다() {
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);        // 활성 아이템
+        insertStock("HMC-CL-00222", "클러치 디스크", 2L, 80, 25, false);  // 비활성 아이템
+
+        StockSummaryPage page = adapter.search(
+                query(null, List.of(), null, StockSortField.NAME, SortDirection.ASC, 1, 20));
+
+        assertThat(page.totalElements()).isEqualTo(2); // 비활성 아이템도 목록엔 노출(B3)
+        StockSummary active = page.content().stream()
+                .filter(s -> s.sku().equals("HMC-EN-00214")).findFirst().orElseThrow();
+        StockSummary inactive = page.content().stream()
+                .filter(s -> s.sku().equals("HMC-CL-00222")).findFirst().orElseThrow();
+        assertThat(active.itemActive()).isTrue();
+        assertThat(inactive.itemActive()).isFalse();
+    }
+
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,
                                           StockSortField field, SortDirection direction, int page, int size) {
         return new StockSearchQuery(keyword, warehouseCodes, status, field, direction, page, size);
@@ -435,6 +459,28 @@ class StockRepositoryAdapterTest {
                 .setParameter(7, Instant.parse("2026-05-20T00:00:00Z"))
                 .setParameter(8, Instant.parse("2026-05-20T00:00:00Z"))
                 .setParameter(9, 0L)
+                .executeUpdate();
+    }
+
+    private void insertStock(String sku, String itemName, long warehouseId, int currentStock, int safetyStock,
+                             boolean itemActive) {
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
+        entityManager().createNativeQuery("""
+                        INSERT INTO stock
+                            (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock, item_active,
+                             created_at, updated_at, version)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """)
+                .setParameter(1, sku)
+                .setParameter(2, itemName)
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, currentStock)
+                .setParameter(6, safetyStock)
+                .setParameter(7, itemActive)
+                .setParameter(8, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(9, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(10, 0L)
                 .executeUpdate();
     }
 

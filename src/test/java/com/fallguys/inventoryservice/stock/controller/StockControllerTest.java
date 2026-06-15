@@ -532,7 +532,7 @@ class StockControllerTest {
                 public StockSummaryPage search(StockSearchQuery query) {
                     StockSummary item = new StockSummary(
                             1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, "WH-SE-001", "서울 1창고",
-                            48, 50, Instant.parse("2026-05-20T14:22:00Z"), true);
+                            48, 50, Instant.parse("2026-05-20T14:22:00Z"), true, true);
                     return new StockSummaryPage(List.of(item), query.page(), query.size(), 42, 3);
                 }
 
