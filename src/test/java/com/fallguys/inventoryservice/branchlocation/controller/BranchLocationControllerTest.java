@@ -118,6 +118,21 @@ class BranchLocationControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
     }
 
+    @Test
+    void 미할당목록조회는_200과_미할당_지점_content를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/branch-locations/unassigned").with(roleJwt(UserRole.HQ_MANAGER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(6))
+                .andExpect(jsonPath("$.content[0].name").value("서울 금천지점1"));
+    }
+
+    @Test
+    void 미할당목록조회는_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/branch-locations/unassigned").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -144,6 +159,11 @@ class BranchLocationControllerTest {
                     return List.of(
                             BranchLocation.of(1L, "서울 강남지점"),
                             BranchLocation.of(2L, "서울 송파지점"));
+                }
+
+                @Override
+                public List<BranchLocation> findUnassigned() {
+                    return List.of(BranchLocation.of(6L, "서울 금천지점1"));
                 }
             };
             return new BranchLocationService(repository);

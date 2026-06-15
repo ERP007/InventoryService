@@ -29,7 +29,7 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary(
-                w.id, w.code, w.name, w.type, b.name, w.active, w.createdAt, w.updatedAt)
+                w.id, w.code, w.name, w.type, b.name, w.address, w.active, w.createdAt, w.updatedAt)
             FROM WarehouseEntity w
             LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
             WHERE (:keyword IS NULL
@@ -48,6 +48,12 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
     /** 창고 코드 존재 여부(등록 전 중복 검사). */
     boolean existsByCode(String code);
 
+    /** 소속 지점에 할당된 창고 존재 여부(지점↔창고 1:1 매핑 검증). */
+    boolean existsByBranchId(Long branchId);
+
+    /** 지정 창고(code)를 제외하고 소속 지점에 할당된 창고 존재 여부(1:1 매핑 검증, 수정 시 자기 제외). */
+    boolean existsByBranchIdAndCodeNot(Long branchId, String code);
+
     /**
      * 식별자로 창고를 읽기 모델(WarehouseSummary)로 투영한다(등록 직후 응답 구성용).
      *
@@ -55,7 +61,7 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary(
-                w.id, w.code, w.name, w.type, b.name, w.active, w.createdAt, w.updatedAt)
+                w.id, w.code, w.name, w.type, b.name, w.address, w.active, w.createdAt, w.updatedAt)
             FROM WarehouseEntity w
             LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
             WHERE w.id = :id

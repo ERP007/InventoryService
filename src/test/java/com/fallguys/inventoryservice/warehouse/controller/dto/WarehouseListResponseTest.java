@@ -15,10 +15,10 @@ class WarehouseListResponseTest {
     @Test
     void 읽기모델_목록을_응답_DTO로_매핑하고_totalElements를_채운다() {
         WarehouseSummary hq = new WarehouseSummary(
-                1L, "HQ-001", "본사 중앙창고", WarehouseType.HQ, null, true,
+                1L, "HQ-001", "본사 중앙창고", WarehouseType.HQ, null, null, true,
                 Instant.parse("2024-01-15T09:00:00Z"), Instant.parse("2024-01-15T09:00:00Z"));
         WarehouseSummary dealer = new WarehouseSummary(
-                2L, "HW-SE-001", "서울 1창고", WarehouseType.DEALER, "서울 강남지점", true,
+                2L, "HW-SE-001", "서울 1창고", WarehouseType.DEALER, "서울 강남지점", "서울 강남구", true,
                 Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2025-11-02T14:30:00Z"));
 
         WarehouseListResponse response = WarehouseListResponse.from(List.of(hq, dealer), "code,asc");
@@ -28,6 +28,7 @@ class WarehouseListResponseTest {
         assertThat(response.content()).hasSize(2);
         assertThat(response.content().get(0).branchName()).isNull();
         assertThat(response.content().get(1).branchName()).isEqualTo("서울 강남지점");
+        assertThat(response.content().get(1).address()).isEqualTo("서울 강남구");
         assertThat(response.content().get(1).code()).isEqualTo("HW-SE-001");
     }
 

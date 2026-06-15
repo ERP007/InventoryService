@@ -38,4 +38,11 @@ public class BranchLocationRepositoryAdapter implements BranchLocationRepository
                 .map(BranchLocationEntity::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<BranchLocation> findUnassigned() {
+        return jpaDao.findUnassigned().stream()
+                .map(BranchLocationEntity::toDomain)
+                .toList();
+    }
 }

@@ -449,7 +449,7 @@ class WarehouseControllerTest {
                 @Override
                 public List<WarehouseSummary> search(WarehouseSearchQuery query) {
                     return List.of(new WarehouseSummary(
-                            1L, "HQ-001", "본사 중앙창고", WarehouseType.HQ, null, true,
+                            1L, "HQ-001", "본사 중앙창고", WarehouseType.HQ, null, null, true,
                             Instant.parse("2024-01-15T09:00:00Z"), Instant.parse("2024-01-15T09:00:00Z")));
                 }
 
@@ -476,7 +476,7 @@ class WarehouseControllerTest {
                     Warehouse w = lastSaved[0];
                     String branchName = w.getBranchId() == null ? null : "서울 강남지점";
                     return Optional.of(new WarehouseSummary(
-                            id, w.getCode(), w.getName(), w.getType(), branchName, w.isActive(),
+                            id, w.getCode(), w.getName(), w.getType(), branchName, w.getAddress(), w.isActive(),
                             Instant.parse("2026-05-28T14:30:00Z"), Instant.parse("2026-05-28T14:30:00Z")));
                 }
 
