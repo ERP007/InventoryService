@@ -14,14 +14,14 @@ INSERT INTO branch_location (name) VALUES
  ('서울 강남지점2');
 
 -- 2) 창고(warehouse). 본사(HQ)는 branch 없음, 대리점(DEALER)은 지점에 매핑. version은 낙관락 초기값 0.
-INSERT INTO warehouse (code, name, type, branch_id, active, version) VALUES
- ('HQ-SE-001',    '본사',           'HQ',     NULL, true,  0),
- ('BR-SE-001', '서울 강남창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '서울 강남지점'),   true,  0),
- ('BR-SE-002', '서울 송파창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '서울 송파지점'),   true,  0),
- ('BR-BU-001', '부산 해운대창고', 'DEALER', (SELECT id FROM branch_location WHERE name = '부산 해운대지점'), false, 0),
- ('BR-DJ-001', '대전 둔산창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '대전 둔산지점'),   true,  0),
- ('BR-GJ-001', '광주 첨단창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '광주 첨단지점'),   true,  0),
- ('BR-SE-003', '서울 강남창고2',  'DEALER', (SELECT id FROM branch_location WHERE name = '서울 강남지점2'),   true,  0);
+INSERT INTO warehouse (code, name, type, branch_id, address, active, version) VALUES
+ ('HQ-SE-001', '본사',           'HQ',     NULL, '서울특별시 서초구 헌릉로 12', true,  0),
+ ('BR-SE-001', '서울 강남창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '서울 강남지점'),   '서울특별시 강남구 테헤란로 521', true,  0),
+ ('BR-SE-002', '서울 송파창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '서울 송파지점'),   '서울특별시 송파구 올림픽로 300', true,  0),
+ ('BR-BU-001', '부산 해운대창고', 'DEALER', (SELECT id FROM branch_location WHERE name = '부산 해운대지점'), '부산광역시 해운대구 센텀중앙로 79', false, 0),
+ ('BR-DJ-001', '대전 둔산창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '대전 둔산지점'),   '대전광역시 서구 둔산로 100', true,  0),
+ ('BR-GJ-001', '광주 첨단창고',   'DEALER', (SELECT id FROM branch_location WHERE name = '광주 첨단지점'),   '광주광역시 광산구 첨단과기로 200', true,  0),
+ ('BR-SE-003', '서울 강남창고2',  'DEALER', (SELECT id FROM branch_location WHERE name = '서울 강남지점2'),   '서울특별시 강남구 봉은사로 311', true,  0);
 
 -- 3) 재고(stock). item_unit은 부품 단위 스냅샷(EA/BOX/SET/L). current_stock은 출고 반영 후 최종 잔량(이력의 stock_after와 일치).
 INSERT INTO stock (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock, created_by, updated_by, created_at, updated_at, version) VALUES
