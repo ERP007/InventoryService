@@ -18,6 +18,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchAlreadyAssignedException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.LastActiveHqWarehouseException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseBranchRuleException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
@@ -228,6 +229,12 @@ class WarehouseServiceTest {
                 active, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"), version);
     }
 
+    private static WarehouseSummaryForEdit forEditHq(boolean active, long version) {
+        return new WarehouseSummaryForEdit(
+                1L, "WH-HQ-001", "본사 중앙창고", WarehouseType.HQ, null, null, "주소",
+                active, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"), version);
+    }
+
     @Test
     void changeActive는_같은_값이면_no_op으로_현재상태를_반환하고_위임하지_않는다() {
         StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
@@ -262,6 +269,47 @@ class WarehouseServiceTest {
 
         assertThatThrownBy(() -> service.changeActive("NOPE", new ChangeWarehouseActiveCommand(false, 6L)))
                 .isInstanceOf(WarehouseNotFoundException.class);
+    }
+
+    @Test
+    void changeActive_마지막_활성_HQ를_비활성화하면_LastActiveHqWarehouseException을_던지고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(true, 6L);
+        repository.hqSummaries = List.of(new WarehouseHqSummary(1L, "WH-HQ-001", "본사 중앙창고")); // 활성 HQ 1개뿐
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(false, 6L)))
+                .isInstanceOf(LastActiveHqWarehouseException.class);
+        assertThat(repository.changeActiveCalled).isFalse();
+    }
+
+    @Test
+    void changeActive_다른_활성_HQ가_있으면_HQ_비활성화를_위임한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(true, 6L);
+        repository.hqSummaries = List.of(
+                new WarehouseHqSummary(1L, "WH-HQ-001", "본사 중앙창고"),
+                new WarehouseHqSummary(5L, "WH-HQ-002", "본사 제2창고")); // 활성 HQ 2개
+        repository.changeActiveResult = forEditHq(false, 7L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(false, 6L));
+
+        assertThat(result.active()).isFalse();
+        assertThat(repository.changeActiveCalled).isTrue();
+    }
+
+    @Test
+    void changeActive_비활성_HQ_재활성화는_활성HQ_규칙과_무관하게_위임한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(false, 6L); // 현재 비활성 HQ
+        repository.changeActiveResult = forEditHq(true, 7L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(true, 6L));
+
+        assertThat(result.active()).isTrue();
+        assertThat(repository.changeActiveCalled).isTrue();
     }
 
     private static final class StubWarehouseRepository implements WarehouseRepository {
