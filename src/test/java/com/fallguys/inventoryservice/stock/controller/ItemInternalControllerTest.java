@@ -167,6 +167,70 @@ class ItemInternalControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
     }
 
+    // ---- PATCH /{sku}/active (활성 여부 동기화) ----
+
+    @Test
+    void 활성동기화는_ADMIN이면_200과_변경건수_창고코드를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/active")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sku").value("HMC-EN-00214"))
+                .andExpect(jsonPath("$.updatedCount").value(2))
+                .andExpect(jsonPath("$.warehouseCodes.length()").value(2));
+    }
+
+    @Test
+    void 활성동기화는_HQ_MANAGER도_허용된다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/active")
+                        .with(roleJwt(UserRole.HQ_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":true}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 활성동기화는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/active")
+                        .with(roleJwt(UserRole.BRANCH_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":false}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 활성동기화는_active_누락이면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/active")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("active"));
+    }
+
+    @Test
+    void 활성동기화는_active_형식이_틀리면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/active")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active":"네"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -185,6 +249,11 @@ class ItemInternalControllerTest {
 
                 @Override
                 public int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
+                    return "HMC-EN-00214".equals(sku) ? 2 : 0;
+                }
+
+                @Override
+                public int updateItemActiveBySku(String sku, boolean active) {
                     return "HMC-EN-00214".equals(sku) ? 2 : 0;
                 }
 

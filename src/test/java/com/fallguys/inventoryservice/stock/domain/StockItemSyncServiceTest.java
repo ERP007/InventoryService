@@ -64,12 +64,29 @@ class StockItemSyncServiceTest {
         assertThat(repo.updatedUnit).isEqualTo(ItemUnit.BOX);
     }
 
+    @Test
+    void syncItemActive은_sku의_모든_창고행_활성여부를_갱신하고_변경창고와_건수를_반환한다() {
+        StubStockRepository repo = new StubStockRepository();
+        repo.codes = List.of("HQ-001", "WH-SE-001");
+        repo.updateReturn = 2;
+        StockItemSyncService service = new StockItemSyncService(repo);
+
+        ItemSyncResult result = service.syncItemActive("HMC-EN-00214", false);
+
+        assertThat(result.sku()).isEqualTo("HMC-EN-00214");
+        assertThat(result.updatedCount()).isEqualTo(2);
+        assertThat(result.warehouseCodes()).containsExactly("HQ-001", "WH-SE-001");
+        assertThat(repo.updatedSku).isEqualTo("HMC-EN-00214");
+        assertThat(repo.updatedActive).isFalse();
+    }
+
     private static final class StubStockRepository implements StockRepository {
         private List<String> codes = List.of();
         private int updateReturn = 0;
         private String updatedSku;
         private String updatedName;
         private ItemUnit updatedUnit;
+        private Boolean updatedActive;
 
         @Override
         public List<String> findWarehouseCodesBySku(String sku) {
@@ -87,6 +104,13 @@ class StockItemSyncServiceTest {
         public int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
             this.updatedSku = sku;
             this.updatedUnit = itemUnit;
+            return updateReturn;
+        }
+
+        @Override
+        public int updateItemActiveBySku(String sku, boolean active) {
+            this.updatedSku = sku;
+            this.updatedActive = active;
             return updateReturn;
         }
 

@@ -182,6 +182,14 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
     int updateItemUnitBySku(@Param("sku") String sku, @Param("itemUnit") ItemUnit itemUnit);
 
     /**
+     * sku를 가진 모든 stock 행의 item_active를 일괄 교체한다(Item 마스터 활성 동기화). 변경된 행 수를 반환한다.
+     * 비정규화 미러 갱신이라 @Version·감사 컬럼은 건드리지 않는다. 창고 활성 여부와 무관하게 전 행을 갱신한다.
+     */
+    @Modifying
+    @Query("UPDATE StockEntity s SET s.itemActive = :active WHERE s.sku = :sku")
+    int updateItemActiveBySku(@Param("sku") String sku, @Param("active") boolean active);
+
+    /**
      * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.
      * COUNT(CASE …)로 부족(0&lt;현재고&lt;안전)·무재고(현재고=0)를 세어 결과가 없어도 null 없이 0을 반환한다.
      * 비활성 창고·비활성 아이템(SKU)의 재고는 집계에서 제외한다(KPI는 운영 중 창고·부품만 반영).

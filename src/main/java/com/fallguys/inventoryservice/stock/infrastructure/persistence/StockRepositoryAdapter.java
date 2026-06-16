@@ -115,6 +115,11 @@ public class StockRepositoryAdapter implements StockRepository {
     }
 
     @Override
+    public int updateItemActiveBySku(String sku, boolean active) {
+        return jpaDao.updateItemActiveBySku(sku, active);
+    }
+
+    @Override
     public StockStatusCount countByStatus(List<String> warehouseCodes) {
         return jpaDao.countByStatus(!warehouseCodes.isEmpty(), warehouseCodes);
     }

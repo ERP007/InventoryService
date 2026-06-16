@@ -44,4 +44,16 @@ public class StockItemSyncService {
         int updatedCount = stockRepository.updateItemUnitBySku(sku, itemUnit);
         return new ItemSyncResult(sku, updatedCount, warehouseCodes);
     }
+
+    /**
+     * Item 마스터의 활성 여부 변경을 stock 비정규화 컬럼에 동기화한다(internal). 흐름·트랜잭션·동시성 정책은 {@link #syncItemName}과 동일하다.
+     * 해당 sku의 모든 창고 행 item_active를 일괄 교체하고, 대상 행이 없으면 0건으로 정상 종료한다(재고 이력·@Version·감사 컬럼 미반영).
+     * 비활성으로 바뀌면 이후 그 부품의 조정·입출고는 기존 비활성 차단 규칙(ITEM_INACTIVE)이 자동 적용된다.
+     */
+    @Transactional
+    public ItemSyncResult syncItemActive(String sku, boolean active) {
+        List<String> warehouseCodes = stockRepository.findWarehouseCodesBySku(sku);
+        int updatedCount = stockRepository.updateItemActiveBySku(sku, active);
+        return new ItemSyncResult(sku, updatedCount, warehouseCodes);
+    }
 }

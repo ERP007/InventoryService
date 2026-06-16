@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
+import com.fallguys.inventoryservice.stock.controller.dto.ItemActiveSyncRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.ItemNameSyncRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.ItemSyncResponse;
 import com.fallguys.inventoryservice.stock.controller.dto.ItemUnitSyncRequest;
@@ -70,6 +71,25 @@ public class ItemInternalController {
             @Valid @RequestBody ItemUnitSyncRequest request) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.HQ_STAFF);
         ItemSyncResult result = stockItemSyncService.syncItemUnit(sku, request.itemUnit());
+        return ResponseEntity.ok(ItemSyncResponse.from(result));
+    }
+
+    /**
+     * Item 마스터의 활성 여부 변경을 해당 sku의 모든 stock 행에 동기화한다. ADMIN·HQ_MANAGER·HQ_STAFF 전용(그 외 403).
+     * 대상 행이 없어도(미적재 부품) 200으로 정상 반환한다. active 누락·형식 오류는 400(INVALID_PARAMETER)으로 매핑된다.
+     */
+    @Operation(
+            summary = "아이템 활성 여부 동기화(내부)",
+            description = "Item 마스터 활성/비활성 토글 시 호출. 해당 sku의 모든 창고 stock 행 item_active를 일괄 갱신하고 "
+                    + "변경 행 수·창고 코드 목록을 반환한다. 비활성 전환 시 이후 입출고·조정이 차단된다. 멱등(절대값 교체)."
+    )
+    @PatchMapping("/{sku}/active")
+    public ResponseEntity<ItemSyncResponse> syncItemActive(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "부품 SKU") @PathVariable String sku,
+            @Valid @RequestBody ItemActiveSyncRequest request) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.HQ_STAFF);
+        ItemSyncResult result = stockItemSyncService.syncItemActive(sku, request.active());
         return ResponseEntity.ok(ItemSyncResponse.from(result));
     }
 }

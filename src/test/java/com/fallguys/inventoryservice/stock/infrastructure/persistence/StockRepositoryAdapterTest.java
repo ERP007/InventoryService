@@ -428,6 +428,24 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
+    void updateItemActiveBySku는_해당_sku_모든_행_활성여부를_바꾸고_변경행수를_반환한다() {
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);  // item_active 기본 true
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100); // true
+        insertStock("HMC-BR-00788", "브레이크 패드", 2L, 30, 40);   // 다른 sku(안 바뀜)
+
+        int updated = adapter.updateItemActiveBySku("HMC-EN-00214", false);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(updated).isEqualTo(2);
+        // 비활성 아이템도 활성 창고 행이면 조회된다(findSkuWarehouseStocks는 창고 활성만 거름) → itemActive 투영 확인
+        List<StockSkuRow> en = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of());
+        assertThat(en).extracting(StockSkuRow::itemActive).containsOnly(false);
+        List<StockSkuRow> br = adapter.findSkuWarehouseStocks("HMC-BR-00788", List.of());
+        assertThat(br.get(0).itemActive()).isTrue();
+    }
+
+    @Test
     void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
         seedStocks();
 
