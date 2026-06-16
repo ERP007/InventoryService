@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -38,6 +39,15 @@ public interface StockRepository {
 
     /** sku의 창고별 재고 행을 조회한다(상세 패널). warehouseCodes가 비어있으면 전체 창고, 있으면 해당 창고로 한정. */
     List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes);
+
+    /**
+     * sku의 창고별 현재고를 최근 수정(updated_at) 내림차순으로 최대 limit건 조회한다(부품 마스터 화면 창고별 현재고 패널).
+     * warehouseCodes가 비어있으면 전사, 있으면 해당 창고로 한정한다. 비활성 창고는 제외하고, 비활성 부품(SKU)은 포함한다(단순 조회).
+     * 기본값 빈 리스트는 영속 구현체(StockRepositoryAdapter)가 반드시 override한다 — 이 조회와 무관한 테스트 stub의 보일러플레이트를 줄이기 위한 기본값일 뿐이다.
+     */
+    default List<ItemStockRow> findRecentItemStocks(String sku, List<String> warehouseCodes, int limit) {
+        return List.of();
+    }
 
     /** 범위 내 (sku × warehouse) 포지션의 총/부족/무재고 수를 센다(KPI). warehouseCodes가 비어있으면 전사. */
     StockStatusCount countByStatus(List<String> warehouseCodes);

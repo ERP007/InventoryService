@@ -44,7 +44,7 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    curl -fsS --retry 10 --retry-delay 3 --max-time 10 "$HEALTH_URL" >/dev/null
+                    curl -fsS --retry 10 --retry-all-errors --retry-delay 3 --connect-timeout 5 --max-time 10 "$HEALTH_URL" >/dev/null
                 '''
             }
         }

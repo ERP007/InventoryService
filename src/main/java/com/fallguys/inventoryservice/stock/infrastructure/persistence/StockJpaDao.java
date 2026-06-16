@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -130,6 +131,27 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             @Param("sku") String sku,
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes);
+
+    /**
+     * sku의 창고별 현재고를 최근 수정 순으로 투영한다(부품 마스터 화면 창고별 현재고 패널, 건수 제한은 Pageable로 위임).
+     * 조인: WarehouseEntity를 (s.warehouseId = w.id)로 조인해 창고 코드·이름을 가져온다. warehouseCodes 필터는 hasWarehouseFilter로 on/off한다.
+     * 비활성 창고 행은 제외한다(active = true). 비활성 부품(SKU)은 거르지 않는다(단순 조회라 노출). 동일 시각은 id 내림차순으로 최신을 우선한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.ItemStockRow(
+                w.code, w.name, s.currentStock, s.safetyStock)
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku
+              AND w.active = true
+              AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+            ORDER BY s.updatedAt DESC, s.id DESC
+            """)
+    List<ItemStockRow> findRecentItemStocks(
+            @Param("sku") String sku,
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes,
+            Pageable pageable);
 
     /**
      * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.

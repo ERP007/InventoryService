@@ -24,7 +24,8 @@ public record MovementResponse(
         ItemUnit unit,
         MovementReason reason,
         String sourceRef,
-        String executorEmpNo
+        String executorEmpNo,
+        String executorName
 ) {
 
     public static MovementResponse from(MovementSummary summary) {
@@ -41,6 +42,7 @@ public record MovementResponse(
                 summary.itemUnit(),
                 summary.reason(),
                 sourceRef,
-                summary.executorEmpNo());
+                summary.executorEmpNo(),
+                summary.executorName());
     }
 }

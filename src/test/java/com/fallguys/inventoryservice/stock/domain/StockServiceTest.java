@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
@@ -17,6 +18,7 @@ import com.fallguys.inventoryservice.stock.domain.exception.ItemServiceUnavailab
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
 import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -283,6 +285,84 @@ class StockServiceTest {
         assertThat(stockRepository.quantitiesQueried).isFalse();
     }
 
+    // ---- getItemStocks (부품 마스터 창고별 현재고) ----
+
+    @Test
+    void getItemStocks_ADMIN은_warehouseCode없으면_전사범위로_최대5건_조회한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        stockRepository.itemStockRows = List.of(
+                new ItemStockRow("WH-HQ-001", "본사 중앙창고", 185, 120),
+                new ItemStockRow("WH-GN-001", "강남 1지점 창고", 2, 120));
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        List<ItemStockRow> rows = service.getItemStocks("HMC-EN-00214", null, TenancyType.ADMIN, null);
+
+        assertThat(stockRepository.itemStocksScope).isEmpty(); // 전사
+        assertThat(stockRepository.itemStocksLimit).isEqualTo(5);
+        assertThat(rows).extracting(ItemStockRow::warehouseCode).containsExactly("WH-HQ-001", "WH-GN-001");
+    }
+
+    @Test
+    void getItemStocks_ADMIN이_있는_warehouseCode를_지정하면_해당창고로_한정한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        service.getItemStocks("HMC-EN-00214", "WH-GN-001", TenancyType.HQ, null);
+
+        assertThat(stockRepository.itemStocksScope).containsExactly("WH-GN-001");
+    }
+
+    @Test
+    void getItemStocks_ADMIN이_없는_warehouseCode를_지정하면_WarehouseNotFoundException을_던지고_조회하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(null), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.getItemStocks("HMC-EN-00214", "NOPE", TenancyType.ADMIN, null))
+                .isInstanceOf(WarehouseNotFoundException.class);
+        assertThat(stockRepository.itemStocksQueried).isFalse();
+    }
+
+    @Test
+    void getItemStocks_BRANCH는_warehouseCode없으면_자기창고로_한정한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        service.getItemStocks("HMC-EN-00214", null, TenancyType.BRANCH, "WH-SE-001");
+
+        assertThat(stockRepository.itemStocksScope).containsExactly("WH-SE-001");
+    }
+
+    @Test
+    void getItemStocks_BRANCH가_본인창고를_지정하면_자기창고로_조회한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        service.getItemStocks("HMC-EN-00214", "WH-SE-001", TenancyType.BRANCH, "WH-SE-001");
+
+        assertThat(stockRepository.itemStocksScope).containsExactly("WH-SE-001");
+    }
+
+    @Test
+    void getItemStocks_BRANCH가_타_창고를_지정하면_ForbiddenException을_던지고_조회하지_않는다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        assertThatThrownBy(() -> service.getItemStocks("HMC-EN-00214", "WH-OTHER", TenancyType.BRANCH, "WH-SE-001"))
+                .isInstanceOf(ForbiddenException.class);
+        assertThat(stockRepository.itemStocksQueried).isFalse();
+    }
+
+    @Test
+    void getItemStocks_재고행이_없으면_빈_리스트를_반환한다() {
+        StubStockRepository stockRepository = new StubStockRepository(); // itemStockRows 기본 빈 리스트
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+
+        List<ItemStockRow> rows = service.getItemStocks("NO-STOCK-SKU", null, TenancyType.ADMIN, null);
+
+        assertThat(rows).isEmpty();
+        assertThat(stockRepository.itemStocksQueried).isTrue();
+    }
+
     private static final class StubStockRepository implements StockRepository {
         private boolean exists = false;
         private boolean safetyUpdated = false;
@@ -297,6 +377,10 @@ class StockServiceTest {
         private boolean quantitiesQueried = false;
         private String quantitiesWarehouseCode;
         private List<String> quantitiesSkus;
+        private List<ItemStockRow> itemStockRows = List.of();
+        private boolean itemStocksQueried = false;
+        private List<String> itemStocksScope;
+        private int itemStocksLimit;
 
         @Override
         public StockSummaryPage search(StockSearchQuery query) {
@@ -340,6 +424,14 @@ class StockServiceTest {
         @Override
         public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
             return List.of();
+        }
+
+        @Override
+        public List<ItemStockRow> findRecentItemStocks(String sku, List<String> warehouseCodes, int limit) {
+            this.itemStocksQueried = true;
+            this.itemStocksScope = warehouseCodes;
+            this.itemStocksLimit = limit;
+            return itemStockRows;
         }
 
         @Override

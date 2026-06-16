@@ -19,6 +19,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -90,6 +91,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public List<StockSkuRow> findSkuWarehouseStocks(String sku, List<String> warehouseCodes) {
         return jpaDao.findSkuWarehouseStocks(sku, !warehouseCodes.isEmpty(), warehouseCodes);
+    }
+
+    @Override
+    public List<ItemStockRow> findRecentItemStocks(String sku, List<String> warehouseCodes, int limit) {
+        return jpaDao.findRecentItemStocks(sku, !warehouseCodes.isEmpty(), warehouseCodes, PageRequest.of(0, limit));
     }
 
     @Override
