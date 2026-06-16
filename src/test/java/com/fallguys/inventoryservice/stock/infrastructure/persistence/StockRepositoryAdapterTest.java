@@ -22,6 +22,7 @@ import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockStatus;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -293,6 +294,72 @@ class StockRepositoryAdapterTest {
         assertThat(rows).allMatch(StockSkuRow::itemActive); // itemActive 투영 확인
     }
 
+    // ---- findRecentItemStocks (부품 마스터 창고별 현재고) ----
+
+    @Test
+    void findRecentItemStocks_전사는_활성창고_재고를_최근수정순_최대5건_반환한다() {
+        insertWarehouse(11L, "WH-A-001", "창고 A");
+        insertWarehouse(12L, "WH-B-001", "창고 B");
+        insertWarehouse(13L, "WH-C-001", "창고 C");
+        insertWarehouse(14L, "WH-D-001", "창고 D");
+        insertWarehouse(15L, "WH-E-001", "창고 E");
+        insertWarehouse(16L, "WH-F-001", "창고 F");
+        // 같은 sku를 6개 창고에 적재하되 updated_at을 다르게 둔다(F가 가장 최근, A가 가장 오래됨).
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 11L, 10, 50, "2026-05-01T00:00:00Z");
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 12L, 10, 50, "2026-05-02T00:00:00Z");
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 13L, 10, 50, "2026-05-03T00:00:00Z");
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 14L, 10, 50, "2026-05-04T00:00:00Z");
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 15L, 10, 50, "2026-05-05T00:00:00Z");
+        insertStockAt("HMC-EN-00214", "엔진오일 필터", 16L, 10, 50, "2026-05-06T00:00:00Z");
+
+        List<ItemStockRow> rows = adapter.findRecentItemStocks("HMC-EN-00214", List.of(), 5);
+
+        // 6건 중 최근 수정 5건만, updated_at 내림차순. 가장 오래된 WH-A-001은 잘린다.
+        assertThat(rows).extracting(ItemStockRow::warehouseCode)
+                .containsExactly("WH-F-001", "WH-E-001", "WH-D-001", "WH-C-001", "WH-B-001");
+    }
+
+    @Test
+    void findRecentItemStocks_창고필터는_해당_창고만_반환한다() {
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);   // WH-SE-001
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100);  // HQ-001
+
+        List<ItemStockRow> rows = adapter.findRecentItemStocks("HMC-EN-00214", List.of("WH-SE-001"), 5);
+
+        assertThat(rows).extracting(ItemStockRow::warehouseCode).containsExactly("WH-SE-001");
+        assertThat(rows.get(0).warehouseName()).isEqualTo("서울 1창고");
+        assertThat(rows.get(0).currentStock()).isEqualTo(120);
+        assertThat(rows.get(0).safetyStock()).isEqualTo(50);
+    }
+
+    @Test
+    void findRecentItemStocks_비활성_창고_행은_제외한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);  // 활성 창고
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);   // 비활성 창고(제외 대상)
+
+        List<ItemStockRow> rows = adapter.findRecentItemStocks("HMC-EN-00214", List.of(), 5);
+
+        assertThat(rows).extracting(ItemStockRow::warehouseCode).containsExactly("WH-SE-001");
+    }
+
+    @Test
+    void findRecentItemStocks_비활성_부품_재고도_포함한다() {
+        insertStock("HMC-CL-00222", "클러치 디스크", 2L, 80, 25, false); // 비활성 아이템(단순 조회라 포함)
+
+        List<ItemStockRow> rows = adapter.findRecentItemStocks("HMC-CL-00222", List.of(), 5);
+
+        assertThat(rows).extracting(ItemStockRow::warehouseCode).containsExactly("WH-SE-001");
+        assertThat(rows.get(0).currentStock()).isEqualTo(80);
+    }
+
+    @Test
+    void findRecentItemStocks_재고가_없으면_빈_리스트다() {
+        seedStocks();
+
+        assertThat(adapter.findRecentItemStocks("NO-SUCH", List.of(), 5)).isEmpty();
+    }
+
     @Test
     void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
         seedStocks();
@@ -458,6 +525,28 @@ class StockRepositoryAdapterTest {
                 .setParameter(6, safetyStock)
                 .setParameter(7, Instant.parse("2026-05-20T00:00:00Z"))
                 .setParameter(8, Instant.parse("2026-05-20T00:00:00Z"))
+                .setParameter(9, 0L)
+                .executeUpdate();
+    }
+
+    private void insertStockAt(String sku, String itemName, long warehouseId, int currentStock, int safetyStock,
+                               String updatedAt) {
+        // 최근 수정 순 정렬 검증용: updated_at(=created_at)을 명시적으로 둔다(네이티브 insert라 Auditing 미동작).
+        String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
+        entityManager().createNativeQuery("""
+                        INSERT INTO stock
+                            (sku, item_name, item_unit, warehouse_id, current_stock, safety_stock,
+                             created_at, updated_at, version)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """)
+                .setParameter(1, sku)
+                .setParameter(2, itemName)
+                .setParameter(3, itemUnit)
+                .setParameter(4, warehouseId)
+                .setParameter(5, currentStock)
+                .setParameter(6, safetyStock)
+                .setParameter(7, Instant.parse(updatedAt))
+                .setParameter(8, Instant.parse(updatedAt))
                 .setParameter(9, 0L)
                 .executeUpdate();
     }
