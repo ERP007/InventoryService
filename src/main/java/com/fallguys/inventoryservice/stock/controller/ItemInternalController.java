@@ -13,6 +13,7 @@ import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
 import com.fallguys.inventoryservice.stock.controller.dto.ItemNameSyncRequest;
 import com.fallguys.inventoryservice.stock.controller.dto.ItemSyncResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.ItemUnitSyncRequest;
 import com.fallguys.inventoryservice.stock.domain.StockItemSyncService;
 import com.fallguys.inventoryservice.stock.domain.query.ItemSyncResult;
 
@@ -50,6 +51,25 @@ public class ItemInternalController {
             @Valid @RequestBody ItemNameSyncRequest request) {
         JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.HQ_STAFF);
         ItemSyncResult result = stockItemSyncService.syncItemName(sku, request.itemName());
+        return ResponseEntity.ok(ItemSyncResponse.from(result));
+    }
+
+    /**
+     * Item 마스터의 단위 변경을 해당 sku의 모든 stock 행에 동기화한다. ADMIN·HQ_MANAGER·HQ_STAFF 전용(그 외 403).
+     * 대상 행이 없어도(미적재 부품) 200으로 정상 반환한다. itemUnit 누락·허용 밖 값은 400(INVALID_PARAMETER)으로 매핑된다.
+     */
+    @Operation(
+            summary = "아이템 단위 동기화(내부)",
+            description = "Item 마스터 단위 수정 시 호출. 해당 sku의 모든 창고 stock 행 item_unit을 일괄 갱신하고 "
+                    + "변경 행 수·창고 코드 목록을 반환한다. itemUnit은 EA/BOX/SET/L. 멱등(절대값 교체)."
+    )
+    @PatchMapping("/{sku}/unit")
+    public ResponseEntity<ItemSyncResponse> syncItemUnit(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "부품 SKU") @PathVariable String sku,
+            @Valid @RequestBody ItemUnitSyncRequest request) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.HQ_STAFF);
+        ItemSyncResult result = stockItemSyncService.syncItemUnit(sku, request.itemUnit());
         return ResponseEntity.ok(ItemSyncResponse.from(result));
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -171,6 +172,14 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
     @Modifying
     @Query("UPDATE StockEntity s SET s.itemName = :itemName WHERE s.sku = :sku")
     int updateItemNameBySku(@Param("sku") String sku, @Param("itemName") String itemName);
+
+    /**
+     * sku를 가진 모든 stock 행의 item_unit을 일괄 교체한다(Item 마스터 단위 동기화). 변경된 행 수를 반환한다.
+     * 비정규화 미러 갱신이라 @Version·감사 컬럼은 건드리지 않는다. 창고 활성 여부와 무관하게 전 행을 갱신한다.
+     */
+    @Modifying
+    @Query("UPDATE StockEntity s SET s.itemUnit = :itemUnit WHERE s.sku = :sku")
+    int updateItemUnitBySku(@Param("sku") String sku, @Param("itemUnit") ItemUnit itemUnit);
 
     /**
      * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.

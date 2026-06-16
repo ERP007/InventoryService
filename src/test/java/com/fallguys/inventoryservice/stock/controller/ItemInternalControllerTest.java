@@ -22,6 +22,7 @@ import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.SecurityConfig;
 import com.fallguys.inventoryservice.shared.security.TestJwtDecoderConfig;
 import com.fallguys.inventoryservice.shared.web.GlobalExceptionHandler;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockItemSyncService;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
@@ -113,6 +114,59 @@ class ItemInternalControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ---- PATCH /{sku}/unit (단위 동기화) ----
+
+    @Test
+    void 단위동기화는_ADMIN이면_200과_변경건수_창고코드를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/unit")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemUnit":"BOX"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sku").value("HMC-EN-00214"))
+                .andExpect(jsonPath("$.updatedCount").value(2))
+                .andExpect(jsonPath("$.warehouseCodes.length()").value(2));
+    }
+
+    @Test
+    void 단위동기화는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/unit")
+                        .with(roleJwt(UserRole.BRANCH_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemUnit":"BOX"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 단위동기화는_itemUnit_누락이면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/unit")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("itemUnit"));
+    }
+
+    @Test
+    void 단위동기화는_itemUnit이_허용밖_값이면_400과_INVALID_PARAMETER를_반환한다() throws Exception {
+        mockMvc.perform(patch("/internal/inventory/items/HMC-EN-00214/unit")
+                        .with(roleJwt(UserRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemUnit":"PALLET"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"));
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -126,6 +180,11 @@ class ItemInternalControllerTest {
 
                 @Override
                 public int updateItemNameBySku(String sku, String itemName) {
+                    return "HMC-EN-00214".equals(sku) ? 2 : 0;
+                }
+
+                @Override
+                public int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
                     return "HMC-EN-00214".equals(sku) ? 2 : 0;
                 }
 

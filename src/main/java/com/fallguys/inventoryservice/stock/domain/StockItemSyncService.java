@@ -33,4 +33,15 @@ public class StockItemSyncService {
         int updatedCount = stockRepository.updateItemNameBySku(sku, itemName);
         return new ItemSyncResult(sku, updatedCount, warehouseCodes);
     }
+
+    /**
+     * Item 마스터의 단위 변경을 stock 비정규화 컬럼에 동기화한다(internal). 흐름·트랜잭션·동시성 정책은 {@link #syncItemName}과 동일하다.
+     * 해당 sku의 모든 창고 행 item_unit을 일괄 교체하고, 대상 행이 없으면 0건으로 정상 종료한다(재고 이력·@Version·감사 컬럼 미반영).
+     */
+    @Transactional
+    public ItemSyncResult syncItemUnit(String sku, ItemUnit itemUnit) {
+        List<String> warehouseCodes = stockRepository.findWarehouseCodesBySku(sku);
+        int updatedCount = stockRepository.updateItemUnitBySku(sku, itemUnit);
+        return new ItemSyncResult(sku, updatedCount, warehouseCodes);
+    }
 }

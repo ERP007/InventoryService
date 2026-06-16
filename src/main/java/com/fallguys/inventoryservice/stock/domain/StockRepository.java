@@ -65,6 +65,14 @@ public interface StockRepository {
         return 0;
     }
 
+    /**
+     * sku를 가진 모든 stock 행의 item_unit을 일괄 교체하고 변경된 행 수를 반환한다(Item 마스터 단위 동기화).
+     * 기본값 0은 영속 구현체(StockRepositoryAdapter)가 반드시 override한다.
+     */
+    default int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
+        return 0;
+    }
+
     /** 범위 내 (sku × warehouse) 포지션의 총/부족/무재고 수를 센다(KPI). warehouseCodes가 비어있으면 전사. */
     StockStatusCount countByStatus(List<String> warehouseCodes);
 

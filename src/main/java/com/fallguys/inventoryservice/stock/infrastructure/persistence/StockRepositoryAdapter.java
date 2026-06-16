@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 
 import com.fallguys.inventoryservice.shared.exception.OptimisticLockConflictException;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.Stock;
 import com.fallguys.inventoryservice.stock.domain.StockRepository;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
@@ -106,6 +107,11 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public int updateItemNameBySku(String sku, String itemName) {
         return jpaDao.updateItemNameBySku(sku, itemName);
+    }
+
+    @Override
+    public int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
+        return jpaDao.updateItemUnitBySku(sku, itemUnit);
     }
 
     @Override
