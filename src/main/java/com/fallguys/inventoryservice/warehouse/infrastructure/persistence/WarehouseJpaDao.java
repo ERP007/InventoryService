@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
 public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
@@ -97,4 +98,21 @@ public interface WarehouseJpaDao extends JpaRepository<WarehouseEntity, Long> {
         ORDER BY w.code ASC
         """)
     List<WarehouseHqSummary> findActiveHq();
+
+    /**
+     * 창고 선택 드롭다운용으로 활성 창고를 슬림 모델(code·표시명)로 투영한다.
+     *
+     * 조인: BranchLocation을 LEFT JOIN하여 소속 지점명을 가져온다. 소속 지점이 없는 HQ(branchId null)는
+     *      COALESCE로 창고명(w.name)으로 대체한다 → DEALER는 소속 지점명, HQ는 창고명.
+     * 필터: active=true(활성 창고만). 정렬: code 오름차순(드롭다운 표시 순서 고정).
+     */
+    @Query("""
+        SELECT new com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption(
+            w.code, COALESCE(b.name, w.name))
+        FROM WarehouseEntity w
+        LEFT JOIN BranchLocationEntity b ON b.id = w.branchId
+        WHERE w.active = true
+        ORDER BY w.code ASC
+        """)
+    List<WarehouseOption> findActiveOptions();
 }

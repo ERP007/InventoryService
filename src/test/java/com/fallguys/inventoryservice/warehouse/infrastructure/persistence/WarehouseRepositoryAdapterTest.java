@@ -19,6 +19,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -116,6 +117,16 @@ class WarehouseRepositoryAdapterTest {
         assertThat(result).extracting(WarehouseHqSummary::code).containsExactly("HQ-001");
         assertThat(result.get(0).id()).isEqualTo(1L);
         assertThat(result.get(0).name()).isEqualTo("본사 중앙창고");
+    }
+
+    @Test
+    void findActiveOptions는_활성_창고만_code오름차순으로_반환하고_HQ는_창고명으로_대체한다() {
+        List<WarehouseOption> result = adapter.findActiveOptions();
+
+        // 활성만(HW-SE-002 비활성 제외), code 오름차순
+        assertThat(result).extracting(WarehouseOption::code).containsExactly("HQ-001", "HW-SE-001");
+        assertThat(result.get(0).name()).isEqualTo("본사 중앙창고");  // HQ는 소속 지점이 없어 창고명으로 대체
+        assertThat(result.get(1).name()).isEqualTo("서울 강남지점");  // DEALER는 소속 지점명
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.shared.query.SortDirection;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
@@ -41,6 +42,11 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     @Override
     public List<WarehouseHqSummary> findActiveHq() {
         return jpaDao.findActiveHq();
+    }
+
+    @Override
+    public List<WarehouseOption> findActiveOptions() {
+        return jpaDao.findActiveOptions();
     }
 
     @Override

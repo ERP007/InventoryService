@@ -24,6 +24,7 @@ import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDup
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -74,6 +75,23 @@ class WarehouseServiceTest {
 
         assertThat(result).extracting(WarehouseHqSummary::code)
                 .containsExactly("WH-HQ-001", "WH-HQ-002");
+    }
+
+    // ---- findWarehouseOptions ----
+
+    @Test
+    void findWarehouseOptions는_레포지토리의_활성_창고_옵션을_그대로_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.options = List.of(
+                new WarehouseOption("HQ-001", "본사 중앙창고"),    // 본사: 지점이 없어 창고명으로 대체
+                new WarehouseOption("BR-SE-001", "서울 강남지점")); // 지점: 소속 지점명
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        List<WarehouseOption> result = service.findWarehouseOptions();
+
+        assertThat(result).extracting(WarehouseOption::code).containsExactly("HQ-001", "BR-SE-001");
+        assertThat(result.get(0).name()).isEqualTo("본사 중앙창고");
+        assertThat(result.get(1).name()).isEqualTo("서울 강남지점");
     }
 
     // ---- create ----
@@ -315,6 +333,7 @@ class WarehouseServiceTest {
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
         private List<WarehouseHqSummary> hqSummaries = List.of();
+        private List<WarehouseOption> options = List.of();
         private WarehouseSearchQuery received;
         private boolean codeExists = false;
         private boolean branchAlreadyAssigned = false;
@@ -341,6 +360,11 @@ class WarehouseServiceTest {
         @Override
         public List<WarehouseHqSummary> findActiveHq() {
             return hqSummaries;
+        }
+
+        @Override
+        public List<WarehouseOption> findActiveOptions() {
+            return options;
         }
 
         @Override

@@ -18,6 +18,7 @@ import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDup
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
@@ -54,6 +55,17 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseHqSummary> findHqWarehouses() {
         return warehouseRepository.findActiveHq();
+    }
+
+    /**
+     * 창고 선택 드롭다운용으로 활성(active=true) 창고를 슬림 모델(code·표시명)로 조회한다.
+     *
+     * 흐름: 영속성에서 활성 창고를 code 오름차순으로 가져온다(표시명은 소속 지점명, 지점이 없는 본사(HQ)는 창고명으로 대체).
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 권한·테넌시 분기 없음(전 Role 동일 결과). 매칭 0건이면 빈 리스트.
+     */
+    @Transactional(readOnly = true)
+    public List<WarehouseOption> findWarehouseOptions() {
+        return warehouseRepository.findActiveOptions();
     }
 
     /**

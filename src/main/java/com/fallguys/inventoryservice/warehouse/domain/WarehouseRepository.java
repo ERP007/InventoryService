@@ -6,6 +6,7 @@ import java.util.Optional;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -22,6 +23,15 @@ public interface WarehouseRepository {
 
     /** 출고 창고 선택용: 활성(active=true) 본사(type=HQ) 창고를 code 오름차순 슬림 모델로 반환한다. 0건이면 빈 리스트. */
     List<WarehouseHqSummary> findActiveHq();
+
+    /**
+     * 창고 선택 드롭다운용: 활성(active=true) 창고를 code 오름차순 슬림 모델(code·표시명)로 반환한다. 0건이면 빈 리스트.
+     * 표시명은 소속 지점명이며, 지점이 없는 본사(HQ)는 창고명으로 대체한다.
+     * 기본값 빈 리스트는 영속 구현체(WarehouseRepositoryAdapter)가 반드시 override한다 — 이 조회와 무관한 테스트 stub의 보일러플레이트를 줄이기 위한 기본값일 뿐이다.
+     */
+    default List<WarehouseOption> findActiveOptions() {
+        return List.of();
+    }
 
     /** 창고 코드 존재 여부. 등록 전 중복 검사에 사용한다. */
     boolean existsByCode(String code);

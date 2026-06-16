@@ -16,6 +16,7 @@ import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCreateReq
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseDetailResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseHqListResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseListResponse;
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseOptionListResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseUpdateRequest;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseService;
@@ -23,6 +24,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseAct
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -77,6 +79,21 @@ public class WarehouseController {
     public ResponseEntity<WarehouseHqListResponse> listHq() {
         List<WarehouseHqSummary> summaries = warehouseService.findHqWarehouses();
         return ResponseEntity.ok(WarehouseHqListResponse.from(summaries));
+    }
+
+    /**
+     * 창고 선택 드롭다운용으로 활성 창고를 슬림 응답(code·소속 지점명)으로 조회한다. 창고 선택 UI 채움용.
+     * 5개 Role 모두 호출 가능(민감 데이터 아님·테넌시 차등 없음). 0건이어도 200과 빈 배열을 반환한다.
+     */
+    @Operation(
+            summary = "창고 선택 목록 조회(드롭다운)",
+            description = "활성(active=true) 창고를 code 오름차순으로 반환한다(code·표시명 슬림). "
+                    + "표시명은 소속 지점명이며, 소속 지점이 없는 본사(HQ) 창고는 창고명으로 대체한다. 0건이면 빈 배열."
+    )
+    @GetMapping("/options")
+    public ResponseEntity<WarehouseOptionListResponse> listOptions() {
+        List<WarehouseOption> options = warehouseService.findWarehouseOptions();
+        return ResponseEntity.ok(WarehouseOptionListResponse.from(options));
     }
 
     /**
