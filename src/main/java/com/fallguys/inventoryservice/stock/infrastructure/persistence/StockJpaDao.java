@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +15,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 
+import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -152,6 +154,40 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes,
             Pageable pageable);
+
+    /** sku를 가진 stock 행들의 창고 코드를 code 오름차순으로 조회한다(아이템 동기화 응답용). 창고 활성 여부와 무관하게 전 행을 본다. */
+    @Query("""
+            SELECT w.code
+            FROM StockEntity s
+            JOIN WarehouseEntity w ON w.id = s.warehouseId
+            WHERE s.sku = :sku
+            ORDER BY w.code ASC
+            """)
+    List<String> findWarehouseCodesBySku(@Param("sku") String sku);
+
+    /**
+     * sku를 가진 모든 stock 행의 item_name을 일괄 교체한다(Item 마스터 이름 동기화). 변경된 행 수를 반환한다.
+     * 비정규화 미러 갱신이라 @Version·감사 컬럼은 건드리지 않는다(수량 변화가 아님). 창고 활성 여부와 무관하게 전 행을 갱신한다.
+     */
+    @Modifying
+    @Query("UPDATE StockEntity s SET s.itemName = :itemName WHERE s.sku = :sku")
+    int updateItemNameBySku(@Param("sku") String sku, @Param("itemName") String itemName);
+
+    /**
+     * sku를 가진 모든 stock 행의 item_unit을 일괄 교체한다(Item 마스터 단위 동기화). 변경된 행 수를 반환한다.
+     * 비정규화 미러 갱신이라 @Version·감사 컬럼은 건드리지 않는다. 창고 활성 여부와 무관하게 전 행을 갱신한다.
+     */
+    @Modifying
+    @Query("UPDATE StockEntity s SET s.itemUnit = :itemUnit WHERE s.sku = :sku")
+    int updateItemUnitBySku(@Param("sku") String sku, @Param("itemUnit") ItemUnit itemUnit);
+
+    /**
+     * sku를 가진 모든 stock 행의 item_active를 일괄 교체한다(Item 마스터 활성 동기화). 변경된 행 수를 반환한다.
+     * 비정규화 미러 갱신이라 @Version·감사 컬럼은 건드리지 않는다. 창고 활성 여부와 무관하게 전 행을 갱신한다.
+     */
+    @Modifying
+    @Query("UPDATE StockEntity s SET s.itemActive = :active WHERE s.sku = :sku")
+    int updateItemActiveBySku(@Param("sku") String sku, @Param("active") boolean active);
 
     /**
      * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.

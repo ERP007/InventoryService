@@ -49,6 +49,38 @@ public interface StockRepository {
         return List.of();
     }
 
+    /**
+     * sku를 가진 stock 행들의 창고 코드를 code 오름차순으로 조회한다(아이템 동기화 응답용, 창고 활성 여부 무관). 없으면 빈 리스트.
+     * 기본값 빈 리스트는 영속 구현체(StockRepositoryAdapter)가 반드시 override한다 — 이 조회와 무관한 테스트 stub의 보일러플레이트를 줄이기 위한 기본값일 뿐이다.
+     */
+    default List<String> findWarehouseCodesBySku(String sku) {
+        return List.of();
+    }
+
+    /**
+     * sku를 가진 모든 stock 행의 item_name을 일괄 교체하고 변경된 행 수를 반환한다(Item 마스터 이름 동기화).
+     * 기본값 0은 영속 구현체(StockRepositoryAdapter)가 반드시 override한다.
+     */
+    default int updateItemNameBySku(String sku, String itemName) {
+        return 0;
+    }
+
+    /**
+     * sku를 가진 모든 stock 행의 item_unit을 일괄 교체하고 변경된 행 수를 반환한다(Item 마스터 단위 동기화).
+     * 기본값 0은 영속 구현체(StockRepositoryAdapter)가 반드시 override한다.
+     */
+    default int updateItemUnitBySku(String sku, ItemUnit itemUnit) {
+        return 0;
+    }
+
+    /**
+     * sku를 가진 모든 stock 행의 item_active를 일괄 교체하고 변경된 행 수를 반환한다(Item 마스터 활성 동기화).
+     * 기본값 0은 영속 구현체(StockRepositoryAdapter)가 반드시 override한다.
+     */
+    default int updateItemActiveBySku(String sku, boolean active) {
+        return 0;
+    }
+
     /** 범위 내 (sku × warehouse) 포지션의 총/부족/무재고 수를 센다(KPI). warehouseCodes가 비어있으면 전사. */
     StockStatusCount countByStatus(List<String> warehouseCodes);
 
