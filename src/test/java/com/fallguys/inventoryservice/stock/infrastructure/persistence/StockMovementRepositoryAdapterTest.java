@@ -162,6 +162,16 @@ class StockMovementRepositoryAdapterTest {
     }
 
     @Test
+    void 수행자_사번과_이름을_이력_스냅샷에서_함께_투영한다() {
+        MovementSummaryPage page = adapter.search(query("br-00788", List.of(), null,
+                WIDE_FROM, WIDE_TO, MovementSortField.OCCURRED_AT, SortDirection.DESC, 1, 20));
+
+        MovementSummary row = page.content().get(0);
+        assertThat(row.executorEmpNo()).isEqualTo("HMC0001");
+        assertThat(row.executorName()).isEqualTo("홍길동");
+    }
+
+    @Test
     void findRecentBySku_전체창고는_sku의_최근이력을_시각내림차순으로_반환한다() {
         // HMC-EN-00214: 06-04(ADJUST -5), 06-03(IN 30), 05-15(OUT -40, IN 40: 동일시각 id 내림차순)
         List<MovementHistory> history = adapter.findRecentBySku("HMC-EN-00214", List.of(), 5);
