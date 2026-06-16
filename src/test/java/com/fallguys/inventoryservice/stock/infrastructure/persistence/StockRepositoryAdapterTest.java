@@ -360,6 +360,56 @@ class StockRepositoryAdapterTest {
         assertThat(adapter.findRecentItemStocks("NO-SUCH", List.of(), 5)).isEmpty();
     }
 
+    // ---- findWarehouseCodesBySku / updateItemNameBySku (아이템 이름 동기화) ----
+
+    @Test
+    void findWarehouseCodesBySku는_해당_sku의_창고코드를_활성무관_code오름차순으로_반환한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);       // 비활성 창고
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);   // WH-SE-001 (활성)
+        insertStock("HMC-EN-00214", "엔진오일 필터", 5L, 500, 100);  // HQ-001 (활성)
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 10, 50);    // WH-OLD-001 (비활성)
+        insertStock("HMC-BR-00788", "브레이크 패드", 2L, 30, 40);    // 다른 sku
+
+        List<String> codes = adapter.findWarehouseCodesBySku("HMC-EN-00214");
+
+        // 비활성 창고(WH-OLD-001)도 포함(창고 활성 무관), code 오름차순, 다른 sku 제외
+        assertThat(codes).containsExactly("HQ-001", "WH-OLD-001", "WH-SE-001");
+    }
+
+    @Test
+    void findWarehouseCodesBySku는_재고가_없으면_빈_리스트다() {
+        seedStocks();
+
+        assertThat(adapter.findWarehouseCodesBySku("NO-SUCH")).isEmpty();
+    }
+
+    @Test
+    void updateItemNameBySku는_해당_sku_모든_행_이름을_바꾸고_변경행수를_반환한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);   // 활성
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 10, 50);    // 비활성 창고도 갱신 대상
+        insertStock("HMC-BR-00788", "브레이크 패드", 2L, 30, 40);    // 다른 sku(안 바뀜)
+
+        int updated = adapter.updateItemNameBySku("HMC-EN-00214", "엔진오일 필터(개선형)");
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(updated).isEqualTo(2); // 활성+비활성 모두(창고 활성 무관)
+        // 활성 창고 행은 이름이 바뀐 게 보인다(findSkuWarehouseStocks는 활성 창고만 노출)
+        List<StockSkuRow> en = adapter.findSkuWarehouseStocks("HMC-EN-00214", List.of());
+        assertThat(en).extracting(StockSkuRow::itemName).containsExactly("엔진오일 필터(개선형)");
+        // 다른 sku는 그대로
+        List<StockSkuRow> br = adapter.findSkuWarehouseStocks("HMC-BR-00788", List.of());
+        assertThat(br.get(0).itemName()).isEqualTo("브레이크 패드");
+    }
+
+    @Test
+    void updateItemNameBySku는_대상_행이_없으면_0을_반환한다() {
+        seedStocks();
+
+        assertThat(adapter.updateItemNameBySku("NO-SUCH", "이름")).isZero();
+    }
+
     @Test
     void findBySkuAndWarehouseCode는_수정용_재고를_반환한다() {
         seedStocks();
