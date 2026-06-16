@@ -18,11 +18,13 @@ import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchAlreadyAssignedException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.LastActiveHqWarehouseException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseBranchRuleException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -73,6 +75,23 @@ class WarehouseServiceTest {
 
         assertThat(result).extracting(WarehouseHqSummary::code)
                 .containsExactly("WH-HQ-001", "WH-HQ-002");
+    }
+
+    // ---- findWarehouseOptions ----
+
+    @Test
+    void findWarehouseOptions는_레포지토리의_활성_창고_옵션을_그대로_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.options = List.of(
+                new WarehouseOption("HQ-001", "본사 중앙창고"),    // 본사: 지점이 없어 창고명으로 대체
+                new WarehouseOption("BR-SE-001", "서울 강남지점")); // 지점: 소속 지점명
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        List<WarehouseOption> result = service.findWarehouseOptions();
+
+        assertThat(result).extracting(WarehouseOption::code).containsExactly("HQ-001", "BR-SE-001");
+        assertThat(result.get(0).name()).isEqualTo("본사 중앙창고");
+        assertThat(result.get(1).name()).isEqualTo("서울 강남지점");
     }
 
     // ---- create ----
@@ -228,6 +247,12 @@ class WarehouseServiceTest {
                 active, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"), version);
     }
 
+    private static WarehouseSummaryForEdit forEditHq(boolean active, long version) {
+        return new WarehouseSummaryForEdit(
+                1L, "WH-HQ-001", "본사 중앙창고", WarehouseType.HQ, null, null, "주소",
+                active, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:32:00Z"), version);
+    }
+
     @Test
     void changeActive는_같은_값이면_no_op으로_현재상태를_반환하고_위임하지_않는다() {
         StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
@@ -264,9 +289,51 @@ class WarehouseServiceTest {
                 .isInstanceOf(WarehouseNotFoundException.class);
     }
 
+    @Test
+    void changeActive_마지막_활성_HQ를_비활성화하면_LastActiveHqWarehouseException을_던지고_위임하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(true, 6L);
+        repository.hqSummaries = List.of(new WarehouseHqSummary(1L, "WH-HQ-001", "본사 중앙창고")); // 활성 HQ 1개뿐
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThatThrownBy(() -> service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(false, 6L)))
+                .isInstanceOf(LastActiveHqWarehouseException.class);
+        assertThat(repository.changeActiveCalled).isFalse();
+    }
+
+    @Test
+    void changeActive_다른_활성_HQ가_있으면_HQ_비활성화를_위임한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(true, 6L);
+        repository.hqSummaries = List.of(
+                new WarehouseHqSummary(1L, "WH-HQ-001", "본사 중앙창고"),
+                new WarehouseHqSummary(5L, "WH-HQ-002", "본사 제2창고")); // 활성 HQ 2개
+        repository.changeActiveResult = forEditHq(false, 7L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(false, 6L));
+
+        assertThat(result.active()).isFalse();
+        assertThat(repository.changeActiveCalled).isTrue();
+    }
+
+    @Test
+    void changeActive_비활성_HQ_재활성화는_활성HQ_규칙과_무관하게_위임한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEditHq(false, 6L); // 현재 비활성 HQ
+        repository.changeActiveResult = forEditHq(true, 7L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        WarehouseSummaryForEdit result = service.changeActive("WH-HQ-001", new ChangeWarehouseActiveCommand(true, 6L));
+
+        assertThat(result.active()).isTrue();
+        assertThat(repository.changeActiveCalled).isTrue();
+    }
+
     private static final class StubWarehouseRepository implements WarehouseRepository {
         private final List<WarehouseSummary> searchResult;
         private List<WarehouseHqSummary> hqSummaries = List.of();
+        private List<WarehouseOption> options = List.of();
         private WarehouseSearchQuery received;
         private boolean codeExists = false;
         private boolean branchAlreadyAssigned = false;
@@ -293,6 +360,11 @@ class WarehouseServiceTest {
         @Override
         public List<WarehouseHqSummary> findActiveHq() {
             return hqSummaries;
+        }
+
+        @Override
+        public List<WarehouseOption> findActiveOptions() {
+            return options;
         }
 
         @Override

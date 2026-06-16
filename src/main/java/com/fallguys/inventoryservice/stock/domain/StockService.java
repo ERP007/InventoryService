@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
 import com.fallguys.inventoryservice.stock.domain.command.UpdateSafetyStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockAlreadyExistsException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
+import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
@@ -30,6 +32,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class StockService {
+
+    // 부품 마스터 화면 창고별 현재고 패널 반환 상한(최근 수정 순 최대 5건).
+    private static final int ITEM_STOCKS_LIMIT = 5;
 
     private final StockRepository stockRepository;
     // 같은 inventory 서비스 내 warehouse 애그리거트 참조(코드→id 해석, 존재 검증)
@@ -73,6 +78,42 @@ public class StockService {
             throw new WarehouseNotFoundException(query.warehouseCode());
         }
         return stockRepository.findQuantitiesByWarehouseCodeAndSkus(query.warehouseCode(), query.skus());
+    }
+
+    /**
+     * 부품 마스터 화면에서 선택한 sku의 창고별 현재고를 최근 수정 순 최대 5건 조회한다. 전 Role 호출 가능하나 Tenancy로 범위가 다르다.
+     *
+     * 흐름:
+     * 1) BRANCH는 자기 창고(tenancy_code)로만 조회한다. warehouseCode를 줬는데 자기 창고가 아니면 타 창고 접근이라 403으로 막는다(존재 검증조차 하지 않아 타 창고 존재를 노출하지 않는다).
+     * 2) ADMIN·HQ는 전사 범위다. warehouseCode를 줬으면 그 창고로 한정하되 없는 코드는 404로 막고(빈 결과로 숨기지 않음), 미지정이면 전사로 조회한다.
+     * 3) 범위 내 (sku × 활성 창고) 재고를 최근 수정 순 최대 5건 조회한다. 비활성 부품(SKU)도 포함하며, 재고 행이 없으면 빈 리스트를 반환한다(404가 아님 — 부품 존재 검증은 하지 않는 단순 조회).
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음.
+     *
+     * 예외:
+     * - 지점 사용자의 타 창고 조회: ForbiddenException (403)
+     * - ADMIN·HQ가 지정한 미존재 창고: WarehouseNotFoundException (404)
+     */
+    @Transactional(readOnly = true)
+    public List<ItemStockRow> getItemStocks(String sku, String warehouseCode, TenancyType tenancyType, String tenancyCode) {
+        List<String> scope;
+        if (tenancyType == TenancyType.BRANCH) {
+            // 지점은 자기 창고만. 타 창고 코드 지정은 존재 여부와 무관하게 403(존재 은닉).
+            if (warehouseCode != null && !warehouseCode.equals(tenancyCode)) {
+                throw new ForbiddenException();
+            }
+            scope = List.of(tenancyCode);
+        } else if (warehouseCode != null) {
+            // ADMIN·HQ가 특정 창고를 선택한 경우: 없는 창고는 404로 막는다(빈 결과로 숨기지 않음).
+            if (!warehouseRepository.existsByCode(warehouseCode)) {
+                throw new WarehouseNotFoundException(warehouseCode);
+            }
+            scope = List.of(warehouseCode);
+        } else {
+            // ADMIN·HQ가 창고 미지정: 전사 범위.
+            scope = List.of();
+        }
+        return stockRepository.findRecentItemStocks(sku, scope, ITEM_STOCKS_LIMIT);
     }
 
     /**

@@ -13,9 +13,12 @@ import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchAlreadyAssignedException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.BranchNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.exception.LastActiveHqWarehouseException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseCodeDuplicateException;
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
+import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 
@@ -52,6 +55,17 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseHqSummary> findHqWarehouses() {
         return warehouseRepository.findActiveHq();
+    }
+
+    /**
+     * 창고 선택 드롭다운용으로 활성(active=true) 창고를 슬림 모델(code·표시명)로 조회한다.
+     *
+     * 흐름: 영속성에서 활성 창고를 code 오름차순으로 가져온다(표시명은 소속 지점명, 지점이 없는 본사(HQ)는 창고명으로 대체).
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 권한·테넌시 분기 없음(전 Role 동일 결과). 매칭 0건이면 빈 리스트.
+     */
+    @Transactional(readOnly = true)
+    public List<WarehouseOption> findWarehouseOptions() {
+        return warehouseRepository.findActiveOptions();
     }
 
     /**
@@ -151,12 +165,14 @@ public class WarehouseService {
      * 흐름:
      * 1) 창고 코드로 현재 상태를 조회한다(없으면 404).
      * 2) 요청 active가 현재와 같으면 no-op으로 현재 상태를 그대로 반환한다(version 비교 없음 — 멱등·재시도 안전).
-     * 3) 다르면 영속성에 위임해 전환한다 — version 불일치는 409.
+     * 3) 본사(HQ) 창고를 비활성화하는 경우, 활성 본사 창고가 최소 1개는 남아야 하므로 마지막 본사 창고면 막는다(SO 출고 창고 소스 보호).
+     * 4) 그 외 전환은 영속성에 위임한다 — version 불일치는 409.
      *
-     * 트랜잭션: 쓰기. no-op이면 사실상 읽기만 수행하고 version은 증가하지 않는다.
+     * 트랜잭션: 쓰기. no-op·검증 실패면 전환 없이 끝나고 아무것도 변경되지 않는다.
      *
      * 예외:
      * - 창고 없음/소속 외: WarehouseNotFoundException (404)
+     * - 마지막 활성 본사 창고 비활성화: LastActiveHqWarehouseException (409)
      * - version 불일치(실제 전환 시): OptimisticLockConflictException (409)
      */
     @Transactional
@@ -165,6 +181,12 @@ public class WarehouseService {
                 .orElseThrow(() -> new WarehouseNotFoundException(code));
         if (current.active() == command.active()) {
             return current;
+        }
+        // 본사(HQ) 창고를 비활성화하려면 활성 본사 창고가 최소 1개는 남아야 한다(SO 출고 창고의 소스).
+        // findActiveHq에는 비활성화 대상(현재 활성)도 포함되므로, 1개뿐이면 그게 마지막이라 막는다.
+        if (!command.active() && current.type() == WarehouseType.HQ
+                && warehouseRepository.findActiveHq().size() <= 1) {
+            throw new LastActiveHqWarehouseException(code);
         }
         return warehouseRepository.changeActive(code, command);
     }

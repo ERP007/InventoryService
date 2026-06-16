@@ -38,6 +38,7 @@ import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCom
 import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseNotFoundException;
 import com.fallguys.inventoryservice.warehouse.domain.model.WarehouseType;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseHqSummary;
+import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
@@ -107,6 +108,19 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.content[0].code").value("WH-HQ-001"))
                 .andExpect(jsonPath("$.content[0].name").value("본사 서울 창고"))
                 .andExpect(jsonPath("$.content[1].code").value("WH-HQ-002"));
+    }
+
+    // ---- GET /options (창고 선택 드롭다운) : 전체 Role 허용 ----
+
+    @Test
+    void 창고선택목록조회는_200과_code_소속지점명_슬림응답을_반환한다() throws Exception {
+        // 전 Role 허용이므로 가장 낮은 BRANCH_STAFF로도 조회된다. (/options 가 /{code} 보다 우선 매칭됨도 검증)
+        mockMvc.perform(get("/inventory/warehouses/options").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].code").value("HQ-001"))
+                .andExpect(jsonPath("$.content[0].name").value("본사 중앙창고"))   // HQ는 소속 지점이 없어 창고명으로 대체
+                .andExpect(jsonPath("$.content[1].code").value("BR-SE-001"))
+                .andExpect(jsonPath("$.content[1].name").value("서울 강남지점"));
     }
 
     // ---- POST (등록) : ADMIN·HQ_MANAGER ----
@@ -458,6 +472,13 @@ class WarehouseControllerTest {
                     return List.of(
                             new WarehouseHqSummary(1L, "WH-HQ-001", "본사 서울 창고"),
                             new WarehouseHqSummary(5L, "WH-HQ-002", "본사 부산 창고"));
+                }
+
+                @Override
+                public List<WarehouseOption> findActiveOptions() {
+                    return List.of(
+                            new WarehouseOption("HQ-001", "본사 중앙창고"),    // 본사: 지점이 없어 창고명으로 대체
+                            new WarehouseOption("BR-SE-001", "서울 강남지점"));
                 }
 
                 @Override
