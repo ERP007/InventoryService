@@ -227,6 +227,40 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("WAREHOUSE_CODE_DUPLICATE"));
     }
 
+    // ---- GET /code-check (코드 중복 확인) : ADMIN·HQ_MANAGER ----
+
+    @Test
+    void 코드중복확인은_미사용_코드면_200과_available_true를_반환한다() throws Exception {
+        // /code-check 가 /{code} 변수 패턴보다 우선 매칭됨도 함께 검증된다.
+        mockMvc.perform(get("/inventory/warehouses/code-check").param("code", "WH-SE-002").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("WH-SE-002"))
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    void 코드중복확인은_HQ_MANAGER도_허용되며_사용중_코드면_available_false를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/code-check").param("code", "DUP-001").with(roleJwt(UserRole.HQ_MANAGER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("DUP-001"))
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    @Test
+    void 코드중복확인은_code가_공백이면_400과_INVALID_PARAMETER_details를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/code-check").param("code", "   ").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.details[0].field").value("code"));
+    }
+
+    @Test
+    void 코드중복확인은_권한없는_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/warehouses/code-check").param("code", "WH-SE-002").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
     // ---- GET /{code} (단건 조회) : ADMIN·HQ_MANAGER ----
 
     @Test

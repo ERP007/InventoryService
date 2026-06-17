@@ -69,6 +69,19 @@ public class WarehouseService {
     }
 
     /**
+     * 창고 코드의 사용 가능 여부를 조회한다(창고 등록 모달의 "중복 확인" 버튼용).
+     *
+     * 흐름: 영속성에서 코드 존재 여부를 확인하고 그 부정을 반환한다(존재하지 않으면 사용 가능).
+     *
+     * 트랜잭션: 읽기 전용. 외부 호출 없음. 형식 검증(빈 값·길이)은 컨트롤러가 선행하며,
+     * 여기서는 중복만 판정한다. 실제 유일성은 등록(create) 시점에 다시 검사된다(확인↔등록 사이 경합은 등록이 막는다).
+     */
+    @Transactional(readOnly = true)
+    public boolean isCodeAvailable(String code) {
+        return !warehouseRepository.existsByCode(code);
+    }
+
+    /**
      * 신규 창고를 등록한다.
      *
      * 흐름:
