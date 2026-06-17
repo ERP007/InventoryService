@@ -94,6 +94,26 @@ class WarehouseServiceTest {
         assertThat(result.get(1).name()).isEqualTo("서울 강남지점");
     }
 
+    // ---- isCodeAvailable ----
+
+    @Test
+    void isCodeAvailable는_코드가_존재하지_않으면_true를_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.codeExists = false;
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThat(service.isCodeAvailable("WH-SE-002")).isTrue();
+    }
+
+    @Test
+    void isCodeAvailable는_코드가_이미_존재하면_false를_반환한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.codeExists = true;
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+
+        assertThat(service.isCodeAvailable("DUP-001")).isFalse();
+    }
+
     // ---- create ----
 
     @Test
