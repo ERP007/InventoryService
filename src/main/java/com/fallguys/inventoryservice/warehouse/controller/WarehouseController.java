@@ -8,10 +8,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
+import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.model.UserRole;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseActiveRequest;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseActiveResponse;
+import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCodeCheckResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseCreateRequest;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseDetailResponse;
 import com.fallguys.inventoryservice.warehouse.controller.dto.WarehouseHqListResponse;
@@ -115,6 +118,40 @@ public class WarehouseController {
                 request.code(), request.name(), request.type(), request.branchId(), request.address());
         WarehouseSummary summary = warehouseService.create(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(WarehouseResponse.from(summary));
+    }
+
+    /**
+     * 창고 등록 모달의 "중복 확인" 버튼용. 입력한 창고 코드가 시스템에 이미 존재하는지 확인한다.
+     * ADMIN·HQ_MANAGER만 호출 가능(그 외 Role은 403 FORBIDDEN). code 누락·공백·50자 초과는 400(INVALID_PARAMETER, details[]에 code).
+     * 중복 여부는 200으로 available 필드로 구분한다(중복이어도 조회 자체는 성공이며, 409는 실제 등록 시점에 발생). 멱등(GET).
+     * (/code-check는 literal 세그먼트라 /{code} 변수 패턴보다 우선 매칭된다 — /hq·/options와 동일.)
+     */
+    @Operation(
+            summary = "창고 코드 중복 확인",
+            description = "창고 코드의 시스템 내 사용 가능 여부를 확인한다. available=true면 등록 가능, false면 이미 사용 중. "
+                    + "이 확인 + available=true 수신 전까지 프론트는 등록 버튼을 막는다."
+    )
+    @GetMapping("/code-check")
+    public ResponseEntity<WarehouseCodeCheckResponse> checkCode(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "중복 확인할 창고 코드 (예: WH-SE-001)")
+            @RequestParam(required = false) String code) {
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        String normalized = requireValidCode(code);
+        boolean available = warehouseService.isCodeAvailable(normalized);
+        return ResponseEntity.ok(new WarehouseCodeCheckResponse(normalized, available));
+    }
+
+    /**
+     * 중복 확인 code 파라미터를 검증·정규화(trim)한다. 누락·공백·50자 초과는 400(INVALID_PARAMETER, details[]에 code).
+     * 등록(WarehouseCreateRequest)의 trim·길이 기준과 동일하게 맞춰, 확인 통과한 코드가 등록에서 형식으로 거부되지 않게 한다.
+     */
+    private static String requireValidCode(String code) {
+        String normalized = code == null ? null : code.trim();
+        if (normalized == null || normalized.isEmpty() || normalized.length() > 50) {
+            throw new InvalidParameterException(List.of(new ParameterViolation("code", code, List.of())));
+        }
+        return normalized;
     }
 
 
