@@ -33,7 +33,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
      * 필터(각 조건은 파라미터로 on/off):
      *   - keyword: 부품명/SKU 부분 일치(대소문자 무시, 호출부가 소문자 LIKE 패턴을 만들어 전달).
      *   - warehouseCodes: hasWarehouseFilter=true일 때만 w.code IN 으로 제한.
-     *   - status: 'NORMAL'/'LOW'/'OUT' 문자열을 현재고·안전재고 비교로 번역(파생 상태를 SQL로 표현).
+     *   - status: 'NORMAL'/'LOW' 문자열을 현재고·안전재고 비교로 번역(파생 상태를 SQL로 표현). LOW는 안전재고 미만(재고 0 포함).
      * 정렬·페이지: Pageable로 위임(정렬식은 어댑터가 화이트리스트로 구성, id tie-breaker 포함).
      */
     @Query(value = """
@@ -44,9 +44,8 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:status IS NULL
-                   OR (:status = 'OUT' AND s.currentStock = 0)
-                   OR (:status = 'LOW' AND s.currentStock > 0 AND s.currentStock < s.safetyStock)
-                   OR (:status = 'NORMAL' AND s.currentStock > 0 AND s.currentStock >= s.safetyStock))
+                   OR (:status = 'LOW' AND s.currentStock < s.safetyStock)
+                   OR (:status = 'NORMAL' AND s.currentStock >= s.safetyStock))
             """,
             countQuery = """
             SELECT COUNT(s)
@@ -55,9 +54,8 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
             WHERE (:keyword IS NULL OR LOWER(s.itemName) LIKE :keyword OR LOWER(s.sku) LIKE :keyword)
               AND (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
               AND (:status IS NULL
-                   OR (:status = 'OUT' AND s.currentStock = 0)
-                   OR (:status = 'LOW' AND s.currentStock > 0 AND s.currentStock < s.safetyStock)
-                   OR (:status = 'NORMAL' AND s.currentStock > 0 AND s.currentStock >= s.safetyStock))
+                   OR (:status = 'LOW' AND s.currentStock < s.safetyStock)
+                   OR (:status = 'NORMAL' AND s.currentStock >= s.safetyStock))
             """)
     Page<StockSummary> search(
             @Param("keyword") String keyword,
@@ -190,15 +188,14 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
     int updateItemActiveBySku(@Param("sku") String sku, @Param("active") boolean active);
 
     /**
-     * 범위 내 포지션의 총/부족/무재고 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.
-     * COUNT(CASE …)로 부족(0&lt;현재고&lt;안전)·무재고(현재고=0)를 세어 결과가 없어도 null 없이 0을 반환한다.
+     * 범위 내 포지션의 총·부족 수를 한 번에 센다(KPI). 상태는 저장 컬럼이 아니라 현재고·안전재고로 파생한다.
+     * COUNT(CASE …)로 부족(현재고 &lt; 안전재고, 재고 0 포함)을 세어 결과가 없어도 null 없이 0을 반환한다(정상 = 총 - 부족).
      * 비활성 창고·비활성 아이템(SKU)의 재고는 집계에서 제외한다(KPI는 운영 중 창고·부품만 반영).
      */
     @Query("""
             SELECT new com.fallguys.inventoryservice.stock.domain.query.StockStatusCount(
                 COUNT(s),
-                COUNT(CASE WHEN s.currentStock > 0 AND s.currentStock < s.safetyStock THEN 1 END),
-                COUNT(CASE WHEN s.currentStock = 0 THEN 1 END))
+                COUNT(CASE WHEN s.currentStock < s.safetyStock THEN 1 END))
             FROM StockEntity s
             JOIN WarehouseEntity w ON w.id = s.warehouseId
             WHERE w.active = true

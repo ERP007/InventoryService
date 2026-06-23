@@ -384,8 +384,8 @@ class StockControllerTest {
         mockMvc.perform(get("/inventory/stocks/kpi").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalSkuCount").value(20))
-                .andExpect(jsonPath("$.lowStockCount").value(3))
-                .andExpect(jsonPath("$.noStockCount").value(1))
+                .andExpect(jsonPath("$.lowStockCount").value(4))
+                .andExpect(jsonPath("$.fulfillmentRate").value(80.0))
                 .andExpect(jsonPath("$.recentAdjustCount").value(8));
     }
 
@@ -579,7 +579,7 @@ class StockControllerTest {
 
                 @Override
                 public StockStatusCount countByStatus(List<String> warehouseCodes) {
-                    return new StockStatusCount(20, 3, 1);
+                    return new StockStatusCount(20, 4); // 부족(안전재고 미만, 재고0 포함) 4, 정상 16
                 }
 
                 @Override

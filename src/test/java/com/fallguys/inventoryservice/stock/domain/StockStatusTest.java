@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Test;
 class StockStatusTest {
 
     @Test
-    void 수량이_0이면_OUT() {
-        assertThat(StockStatus.of(0, 50)).isEqualTo(StockStatus.OUT);
+    void 수량이_0이고_안전재고가_있으면_LOW() {
+        assertThat(StockStatus.of(0, 50)).isEqualTo(StockStatus.LOW);
     }
 
     @Test
@@ -32,7 +32,7 @@ class StockStatusTest {
     }
 
     @Test
-    void 수량과_안전재고가_모두_0이면_OUT() {
-        assertThat(StockStatus.of(0, 0)).isEqualTo(StockStatus.OUT);
+    void 수량과_안전재고가_모두_0이면_NORMAL() {
+        assertThat(StockStatus.of(0, 0)).isEqualTo(StockStatus.NORMAL);
     }
 }

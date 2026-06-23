@@ -98,7 +98,7 @@ class ItemStockControllerTest {
                 .andExpect(jsonPath("$.stocks.length()").value(1))
                 .andExpect(jsonPath("$.stocks[0].warehouseCode").value("WH-GN-001"))
                 .andExpect(jsonPath("$.stocks[0].currentStock").value(0))
-                .andExpect(jsonPath("$.stocks[0].status").value("OUT"));
+                .andExpect(jsonPath("$.stocks[0].status").value("LOW"));
     }
 
     @Test
@@ -198,7 +198,7 @@ class ItemStockControllerTest {
                                 new ItemStockRow("WH-GN-001", "강남 1지점 창고", 2, 120));   // LOW
                     }
                     if (warehouseCodes.equals(List.of("WH-GN-001"))) { // ADMIN·HQ 선택 창고
-                        return List.of(new ItemStockRow("WH-GN-001", "강남 1지점 창고", 0, 120)); // OUT
+                        return List.of(new ItemStockRow("WH-GN-001", "강남 1지점 창고", 0, 120)); // LOW(재고0)
                     }
                     if (warehouseCodes.equals(List.of("WH-SE-001"))) { // BRANCH 자기 창고
                         return List.of(new ItemStockRow("WH-SE-001", "서울 1창고", 48, 50)); // LOW
@@ -243,7 +243,7 @@ class ItemStockControllerTest {
 
                 @Override
                 public StockStatusCount countByStatus(List<String> warehouseCodes) {
-                    return new StockStatusCount(0, 0, 0);
+                    return new StockStatusCount(0, 0);
                 }
 
                 @Override

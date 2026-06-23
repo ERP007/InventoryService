@@ -70,7 +70,7 @@ public class StockController {
      */
     @Operation(
             summary = "재고 목록 조회",
-            description = "부품명/SKU 검색, 창고 다중 필터(콤마 구분), 상태(NORMAL/LOW/OUT) 필터, 정렬, 페이지네이션. "
+            description = "부품명/SKU 검색, 창고 다중 필터(콤마 구분), 상태(NORMAL/LOW) 필터, 정렬, 페이지네이션. "
                     + "BRANCH 사용자는 자기 지점 창고 재고만 조회된다."
     )
     @GetMapping
@@ -80,7 +80,7 @@ public class StockController {
             @RequestParam(required = false) String keyword,
             @Parameter(description = "창고 코드 다중 필터(콤마 구분, 예: WH-SE-001,HQ-001)")
             @RequestParam(required = false) String warehouseCodes,
-            @Parameter(description = "재고 상태 필터: NORMAL / LOW / OUT")
+            @Parameter(description = "재고 상태 필터: NORMAL / LOW")
             @RequestParam(required = false) String status,
             @Parameter(description = "정렬(기본 name,asc). 속성: name/quantity/safetyRatio/lastAdjustedAt, 방향: asc/desc", example = "name,asc")
             @RequestParam(required = false) String sort,
@@ -189,11 +189,11 @@ public class StockController {
 
     /**
      * 대시보드·재고 화면용 KPI를 조회한다. 전 Role 호출 가능하며 집계 범위는 호출자 소속으로 강제된다(BRANCH는 자기 창고).
-     * 총 포지션·부족·무재고·최근 7일 이동 건수를 반환한다. 파라미터·body가 없어 검증 실패(400)가 없고 집계 0이어도 200이다.
+     * 총 포지션·부족·안전재고 충족률·최근 7일 이동 건수를 반환한다. 파라미터·body가 없어 검증 실패(400)가 없고 집계 0이어도 200이다.
      */
     @Operation(
             summary = "재고 KPI 조회",
-            description = "대시보드·재고 화면 진입/새로고침 시 1회 호출. (sku×창고) 총·부족·무재고 포지션 수와 최근 7일 이동 건수를 반환한다. "
+            description = "대시보드·재고 화면 진입/새로고침 시 1회 호출. (sku×창고) 총·부족 포지션 수, 안전재고 충족률, 최근 7일 이동 건수를 반환한다. "
                     + "집계 범위는 호출자 소속으로 강제(BRANCH는 자기 지점 창고)."
     )
     @GetMapping("/kpi")
