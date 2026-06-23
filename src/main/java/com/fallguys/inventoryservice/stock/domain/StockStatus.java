@@ -5,22 +5,14 @@ package com.fallguys.inventoryservice.stock.domain;
  */
 public enum StockStatus {
     NORMAL,
-    LOW,
-    OUT;
+    LOW;
 
     /**
      * 현재고·안전재고로 재고 상태를 파생한다.
-     * - quantity == 0 → OUT
-     * - quantity >= safetyStock → NORMAL (안전재고 이상이면 안전)
-     * - 0 < quantity < safetyStock → LOW (안전재고 미만)
+     * - quantity >= safetyStock → NORMAL (안전재고 이상이면 안전; 안전재고 0이면 재고 0도 정상)
+     * - quantity < safetyStock → LOW (안전재고 미만; 재고 0 포함 — '재고 없음'을 '부족'에 편입)
      */
     public static StockStatus of(int quantity, int safetyStock) {
-        if (quantity == 0) {
-            return OUT;
-        }
-        if (quantity >= safetyStock) {
-            return NORMAL;
-        }
-        return LOW;
+        return quantity >= safetyStock ? NORMAL : LOW;
     }
 }

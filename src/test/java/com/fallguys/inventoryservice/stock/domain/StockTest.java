@@ -112,14 +112,14 @@ class StockTest {
     }
 
     @Test
-    void ADJUST_0으로_실측하면_전량_차감되어_OUT이_된다() {
+    void ADJUST_0으로_실측하면_전량_차감되어_LOW가_된다() {
         Stock stock = Stock.of(1001L, "SKU-1", "부품", ItemUnit.EA, 1L, 50, 40);
 
         int delta = stock.adjust(AdjustmentType.ADJUST, 0);
 
         assertThat(delta).isEqualTo(-50);
         assertThat(stock.getQuantity()).isZero();
-        assertThat(stock.status()).isEqualTo(StockStatus.OUT);
+        assertThat(stock.status()).isEqualTo(StockStatus.LOW); // 재고 0도 안전재고 미만이면 부족
     }
 
     @Test
@@ -180,13 +180,13 @@ class StockTest {
     }
 
     @Test
-    void decrease_전량_차감하면_OUT이_된다() {
+    void decrease_전량_차감하면_LOW가_된다() {
         Stock stock = Stock.of(1001L, "SKU-1", "부품", ItemUnit.EA, 1L, 50, 40);
 
         int delta = stock.decrease(50);
 
         assertThat(delta).isEqualTo(-50);
         assertThat(stock.getQuantity()).isZero();
-        assertThat(stock.status()).isEqualTo(StockStatus.OUT);
+        assertThat(stock.status()).isEqualTo(StockStatus.LOW); // 재고 0도 안전재고 미만이면 부족
     }
 }

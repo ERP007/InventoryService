@@ -127,7 +127,7 @@ public record StockSearchQuery(
                 return candidate;
             }
         }
-        violations.add(new ParameterViolation("status", status, List.of("NORMAL", "LOW", "OUT")));
+        violations.add(new ParameterViolation("status", status, List.of("NORMAL", "LOW")));
         return null;
     }
 
