@@ -25,6 +25,20 @@ spring:
           import_files_sql_extractor: org.hibernate.tool.schema.internal.script.MultiLineSqlScriptExtractor
           charset_name: UTF-8
     open-in-view: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # relay가 "브로커 수신 확정(publisher confirm ack)" 후에만 outbox status=PUBLISHED로 전환하도록 confirm 사용
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        # 비즈니스/DB 반영 + 결과 outbox 커밋 후 수동 ack (Slice 3 리스너에서 사용)
+        acknowledge-mode: manual
+        # 거부(nack)된 메시지는 재큐하지 않고 DLX로 보낸다
+        default-requeue-rejected: false
 
 springdoc:
   api-docs:
@@ -41,3 +55,8 @@ item:
   base-url: ${ITEM_BASE_URL:}
   connect-timeout-ms: ${ITEM_CONNECT_TIMEOUT_MS:2000}
   read-timeout-ms: ${ITEM_READ_TIMEOUT_MS:3000}
+
+# RabbitMQ 비동기 연계 토글. true면 토폴로지 선언 + (Slice 2/3) relay·listener 활성. false(기본)면 기존 동기 컨트롤러만 동작한다.
+inventory:
+  messaging:
+    async-enabled: ${INVENTORY_MESSAGING_ASYNC_ENABLED:false}

@@ -158,11 +158,26 @@ class StockInboundServiceTest {
         assertThat(movementRepo.saved).isEmpty();
     }
 
+    @Test
+    void 기존행은_비관락_조회로_가져온다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.put(Stock.of(11L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 100, 50));
+        StockInboundService service = new StockInboundService(
+                stockRepo, new StubMovementRepository(), new StubWarehouseRepository(2L, true), sku -> Optional.empty());
+
+        service.inbound(command(List.of(new InboundLine("HMC-EN-00214", 30, 1))));
+
+        assertThat(stockRepo.forUpdateCalls).isEqualTo(1); // 비관락(FOR UPDATE) 조회 사용
+        assertThat(stockRepo.codeCalls).isZero();          // 비잠금 조회는 쓰지 않음
+    }
+
     // ---- stubs ----
 
     private static final class StubStockRepository implements StockRepository {
         private final Map<String, Stock> stocks = new HashMap<>();
         private Stock lastSaved;
+        private int codeCalls;       // 비잠금 조회 호출 수(입고는 쓰지 않아야 함)
+        private int forUpdateCalls;  // 비관락 조회 호출 수(입고가 사용)
 
         void put(Stock stock) {
             stocks.put(stock.getSku(), stock);
@@ -174,11 +189,13 @@ class StockInboundServiceTest {
 
         @Override
         public Optional<Stock> findBySkuAndWarehouseCode(String sku, String warehouseCode) {
+            codeCalls++;
             return Optional.ofNullable(stocks.get(sku));
         }
 
         @Override
         public Optional<Stock> findBySkuAndWarehouseIdForUpdate(String sku, Long warehouseId) {
+            forUpdateCalls++;
             return Optional.ofNullable(stocks.get(sku));
         }
 
