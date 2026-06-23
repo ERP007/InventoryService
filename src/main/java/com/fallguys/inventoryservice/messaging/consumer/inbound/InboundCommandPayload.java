@@ -1,4 +1,6 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.inbound;
+
+import com.fallguys.inventoryservice.messaging.consumer.MalformedEventException;
 
 import java.util.List;
 

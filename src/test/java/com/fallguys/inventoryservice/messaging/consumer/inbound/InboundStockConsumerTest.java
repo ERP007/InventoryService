@@ -1,4 +1,7 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.inbound;
+
+import com.fallguys.inventoryservice.messaging.consumer.CommandSource;
+import com.fallguys.inventoryservice.messaging.consumer.MalformedEventException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
