@@ -60,3 +60,7 @@ item:
 inventory:
   messaging:
     async-enabled: ${INVENTORY_MESSAGING_ASYNC_ENABLED:false}
+    relay:
+      poll-interval-ms: ${INVENTORY_MESSAGING_RELAY_POLL_INTERVAL_MS:5000}
+      batch-size: ${INVENTORY_MESSAGING_RELAY_BATCH_SIZE:100}
+      confirm-timeout-ms: ${INVENTORY_MESSAGING_RELAY_CONFIRM_TIMEOUT_MS:5000}

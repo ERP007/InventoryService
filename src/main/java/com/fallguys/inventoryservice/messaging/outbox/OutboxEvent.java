@@ -80,7 +80,7 @@ public class OutboxEvent {
     private OutboxEvent(String aggregateType, String aggregateId, String eventType, UUID eventId,
                         String exchange, String routingKey, String payload) {
         this.aggregateType = aggregateType;
-        this.aggregateId = aggregateId;
+        this.aggregateId = aggregateId; 
         this.eventType = eventType;
         this.eventId = eventId;
         this.exchange = exchange;
@@ -93,11 +93,5 @@ public class OutboxEvent {
     public static OutboxEvent pending(String aggregateType, String aggregateId, String eventType, UUID eventId,
                                       String exchange, String routingKey, String payload) {
         return new OutboxEvent(aggregateType, aggregateId, eventType, eventId, exchange, routingKey, payload);
-    }
-
-    /** Publisher Confirm으로 브로커 수신이 확정된 뒤 호출한다(PENDING→PUBLISHED). */
-    public void markPublished(Instant publishedAt) {
-        this.status = OutboxStatus.PUBLISHED;
-        this.publishedAt = publishedAt;
     }
 }
