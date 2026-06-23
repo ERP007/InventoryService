@@ -28,17 +28,24 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    # 기본값은 로컬 docker-compose 브로커(erp/erp). 운영·통합은 환경변수로 override한다(비밀번호 커밋 금지).
+    username: ${RABBITMQ_USERNAME:erp}
+    password: ${RABBITMQ_PASSWORD:erp}
     # relay가 "브로커 수신 확정(publisher confirm ack)" 후에만 outbox status=PUBLISHED로 전환하도록 confirm 사용
     publisher-confirm-type: correlated
     publisher-returns: true
     listener:
       simple:
-        # 비즈니스/DB 반영 + 결과 outbox 커밋 후 수동 ack (Slice 3 리스너에서 사용)
-        acknowledge-mode: manual
-        # 거부(nack)된 메시지는 재큐하지 않고 DLX로 보낸다
+        # AUTO = 리스너가 정상 반환하면 ack, 예외면 nack(+재시도/DLQ). 처리(2-TX 커밋) 후 반환하므로 "커밋 후 ack"가 보장된다.
+        acknowledge-mode: auto
+        # 재시도 소진 후 거부 시 재큐 금지 → DLX(erp.dlx)로 보낸다
         default-requeue-rejected: false
+        retry:
+          enabled: true        # 기술 실패는 in-process로 재시도(비즈니스 실패는 예외를 안 던지므로 재시도 대상 아님)
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
 
 springdoc:
   api-docs:

@@ -1,0 +1,44 @@
+# 로컬 개발용 RabbitMQ. 운영/통합은 rabbit.erp007.xyz를 환경변수로 가리킨다(자격증명은 여기 커밋 금지).
+# 기동:    docker compose up -d
+# 관리 UI: http://localhost:15672  (erp / erp)
+# 앱 연결: INVENTORY_MESSAGING_ASYNC_ENABLED=true 로 실행하면 localhost:5672(erp/erp)에 붙는다.
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: inventory-rabbitmq
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # 관리 UI
+    environment:
+      # 전용 dev 계정. 'guest'는 비-loopback(컨테이너 포트 매핑) 접속이 막혀 있어 별도 계정을 쓴다.
+      RABBITMQ_DEFAULT_USER: erp
+      RABBITMQ_DEFAULT_PASS: erp
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 로컬 개발용 PostgreSQL. 앱이 ddl-auto=create로 부팅 시 스키마 생성 + import.sql 시드.
+  postgres:
+    image: postgres:16
+    container_name: inventory-postgres
+    ports:
+      - "5433:5432"   # host 5433 (로컬 네이티브 PostgreSQL의 5432 충돌 회피)
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rabbitmq-data:
+  postgres-data:
