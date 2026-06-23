@@ -20,7 +20,7 @@ public class OpenApiConfig {
 
     /**
      * Swagger "Try it out"이 호출할 외부 베이스 URL.
-     * 게이트웨이(/api 접두어) 뒤 배포 환경에서는 OPENAPI_SERVER_URL=https://api.erp007.xyz/api 로 지정한다.
+     * 게이트웨이(/api 접두어) 뒤 배포 환경에서는 OPENAPI_SERVER_URL=https://erp007.xyz/api 로 지정한다.
      * 비어 있으면(로컬) springdoc이 요청 기준으로 server url을 자동 생성한다.
      */
     @Value("${OPENAPI_SERVER_URL:}")
