@@ -294,7 +294,7 @@ class ItemInternalControllerTest {
 
                 @Override
                 public StockStatusCount countByStatus(List<String> warehouseCodes) {
-                    return new StockStatusCount(0, 0, 0);
+                    return new StockStatusCount(0, 0);
                 }
 
                 @Override

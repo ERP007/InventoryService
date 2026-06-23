@@ -101,21 +101,14 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
-    void status_LOW는_0초과_안전재고_미만만_조회한다() {
+    void status_LOW는_안전재고_미만을_재고0포함_조회한다() {
         seedStocks();
         StockSummaryPage page = adapter.search(
                 query(null, List.of(), StockStatus.LOW, StockSortField.NAME, SortDirection.ASC, 1, 20));
 
-        assertThat(page.content()).extracting(StockSummary::sku).containsExactly("HMC-BR-00788");
-    }
-
-    @Test
-    void status_OUT은_수량0만_조회한다() {
-        seedStocks();
-        StockSummaryPage page = adapter.search(
-                query(null, List.of(), StockStatus.OUT, StockSortField.NAME, SortDirection.ASC, 1, 20));
-
-        assertThat(page.content()).extracting(StockSummary::sku).containsExactly("HMC-OIL-5W30");
+        // 부족 = 안전재고 미만(재고 0 포함): BR(30/40), OIL(0/60). 이름 오름차순.
+        assertThat(page.content()).extracting(StockSummary::sku)
+                .containsExactly("HMC-BR-00788", "HMC-OIL-5W30");
     }
 
     @Test
@@ -222,14 +215,13 @@ class StockRepositoryAdapterTest {
     }
 
     @Test
-    void countByStatus_전체창고는_총_부족_무재고_포지션수를_센다() {
+    void countByStatus_전체창고는_총과_부족_재고0포함_포지션수를_센다() {
         seedStocks();
 
         StockStatusCount counts = adapter.countByStatus(List.of());
 
         assertThat(counts.total()).isEqualTo(4);
-        assertThat(counts.low()).isEqualTo(1);   // HMC-BR-00788 (30/40)
-        assertThat(counts.out()).isEqualTo(1);   // HMC-OIL-5W30 (0/60)
+        assertThat(counts.low()).isEqualTo(2);   // HMC-BR-00788 (30/40), HMC-OIL-5W30 (0/60, 재고0도 부족)
     }
 
     @Test
@@ -239,8 +231,7 @@ class StockRepositoryAdapterTest {
         StockStatusCount counts = adapter.countByStatus(List.of("WH-SE-001"));
 
         assertThat(counts.total()).isEqualTo(3);
-        assertThat(counts.low()).isEqualTo(1);
-        assertThat(counts.out()).isEqualTo(1);
+        assertThat(counts.low()).isEqualTo(2);   // BR(30/40), OIL(0/60) 모두 WH-SE-001
     }
 
     @Test
@@ -249,7 +240,6 @@ class StockRepositoryAdapterTest {
 
         assertThat(counts.total()).isZero();
         assertThat(counts.low()).isZero();
-        assertThat(counts.out()).isZero();
     }
 
     @Test
@@ -589,7 +579,7 @@ class StockRepositoryAdapterTest {
     private void seedStocks() {
         insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);   // NORMAL
         insertStock("HMC-BR-00788", "브레이크 패드", 2L, 30, 40);    // LOW
-        insertStock("HMC-OIL-5W30", "엔진오일 5W30", 2L, 0, 60);     // OUT
+        insertStock("HMC-OIL-5W30", "엔진오일 5W30", 2L, 0, 60);     // LOW(재고0, 안전재고 미만)
         insertStock("HMC-TR-00111", "변속기오일", 5L, 500, 100);     // NORMAL (HQ-001)
     }
 

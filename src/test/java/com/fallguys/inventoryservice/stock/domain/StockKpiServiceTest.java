@@ -27,7 +27,7 @@ class StockKpiServiceTest {
     @Test
     void ADMIN은_전사범위로_집계하고_최근7일_기준으로_조정수를_센다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.counts = new StockStatusCount(20, 3, 1);
+        stockRepo.counts = new StockStatusCount(20, 4); // 부족(재고0 포함) 4, 정상 16
         StubMovementRepository movementRepo = new StubMovementRepository();
         movementRepo.recentCount = 8;
         StockKpiService service = new StockKpiService(stockRepo, movementRepo);
@@ -39,15 +39,15 @@ class StockKpiServiceTest {
         assertThat(movementRepo.scope).isEmpty();
         assertThat(movementRepo.since).isEqualTo(now.minus(Duration.ofDays(7)));
         assertThat(kpi.totalSkuCount()).isEqualTo(20);
-        assertThat(kpi.lowStockCount()).isEqualTo(3);
-        assertThat(kpi.noStockCount()).isEqualTo(1);
+        assertThat(kpi.lowStockCount()).isEqualTo(4);
+        assertThat(kpi.fulfillmentRate()).isEqualTo(80.0); // 정상 16 / 총 20
         assertThat(kpi.recentAdjustCount()).isEqualTo(8);
     }
 
     @Test
     void BRANCH는_자기창고로_범위를_강제한다() {
         StubStockRepository stockRepo = new StubStockRepository();
-        stockRepo.counts = new StockStatusCount(5, 2, 0);
+        stockRepo.counts = new StockStatusCount(5, 2);
         StubMovementRepository movementRepo = new StubMovementRepository();
         StockKpiService service = new StockKpiService(stockRepo, movementRepo);
 
@@ -57,8 +57,32 @@ class StockKpiServiceTest {
         assertThat(movementRepo.scope).containsExactly("WH-SE-001");
     }
 
+    @Test
+    void 총_포지션이_0이면_충족률은_0이다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.counts = new StockStatusCount(0, 0);
+        StockKpiService service = new StockKpiService(stockRepo, new StubMovementRepository());
+
+        StockKpi kpi = service.getKpi(TenancyType.ADMIN, null, Instant.parse("2026-06-07T08:00:00Z"));
+
+        assertThat(kpi.totalSkuCount()).isZero();
+        assertThat(kpi.lowStockCount()).isZero();
+        assertThat(kpi.fulfillmentRate()).isEqualTo(0.0);
+    }
+
+    @Test
+    void 충족률은_소수1자리로_반올림한다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.counts = new StockStatusCount(3, 1); // 정상 2 / 총 3 = 66.666… → 66.7
+        StockKpiService service = new StockKpiService(stockRepo, new StubMovementRepository());
+
+        StockKpi kpi = service.getKpi(TenancyType.ADMIN, null, Instant.parse("2026-06-07T08:00:00Z"));
+
+        assertThat(kpi.fulfillmentRate()).isEqualTo(66.7);
+    }
+
     private static final class StubStockRepository implements StockRepository {
-        private StockStatusCount counts = new StockStatusCount(0, 0, 0);
+        private StockStatusCount counts = new StockStatusCount(0, 0);
         private List<String> scope;
 
         @Override
