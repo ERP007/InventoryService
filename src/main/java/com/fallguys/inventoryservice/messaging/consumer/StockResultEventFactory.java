@@ -13,71 +13,93 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fallguys.inventoryservice.messaging.config.RabbitTopologyConfig;
 import com.fallguys.inventoryservice.messaging.outbox.OutboxEvent;
 import com.fallguys.inventoryservice.shared.exception.BusinessException;
+import com.fallguys.inventoryservice.stock.domain.command.InboundCommand;
 import com.fallguys.inventoryservice.stock.domain.command.OutboundCommand;
-import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
+import com.fallguys.inventoryservice.stock.domain.query.InboundResult;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundResult;
 
 /**
- * 출고 결과 이벤트(applied/rejected)를 outbox 행으로 만든다. envelope JSON 전체를 payload에 담고, relay가 그대로 발행한다.
- * correlationId는 sourceRef(SO code)로 둔다. aggregate=(STOCK_OUTBOUND, sourceRef)라 outbox UNIQUE가 결과 1건을 보장한다.
+ * 출고·입고 결과 이벤트(applied/rejected)를 outbox 행으로 만든다. envelope JSON 전체를 payload에 담고 relay가 그대로 발행한다.
+ * correlationId=sourceRef. eventType은 상대 도메인을 붙이지 않고(스키마 동일), routing key에만 상대 도메인(sales/procurement)을 붙인다.
  *
- * <p>movements는 현재 OutboundMovement가 가진 sku·delta·stockAfter(+quantity=|delta|)만 싣는다.
- * sourceLineNo는 결과 DTO에 아직 없어 생략한다(명세 검토 #6 보류 항목 — 결과 매핑 확장 시 추가).
+ * <p>movements는 sku·delta·stockAfter(+quantity=|delta|)만 싣는다. sourceLineNo는 결과 DTO에 아직 없어 생략(명세 #6 보류).
  */
 @Component
 public class StockResultEventFactory {
 
     private static final String PRODUCER = "inventory-service";
     private static final int EVENT_VERSION = 1;
-    private static final String AGGREGATE_TYPE = "STOCK_OUTBOUND";
-    private static final String APPLIED_EVENT_TYPE = "inventory.stock.outbound.applied";
-    private static final String REJECTED_EVENT_TYPE = "inventory.stock.outbound.rejected";
-    private static final String APPLIED_ROUTING_KEY = "inventory.stock.outbound.applied.sales";
-    private static final String REJECTED_ROUTING_KEY = "inventory.stock.outbound.rejected.sales";
+    private static final String OUTBOUND_AGGREGATE = "STOCK_OUTBOUND";
+    private static final String INBOUND_AGGREGATE = "STOCK_INBOUND";
 
-    // 메시징 전용 인스턴스. payload에 java.time 객체를 직접 싣지 않으므로(시각은 문자열로 변환) 기본 매퍼로 충분하고,
-    // 전역 ObjectMapper 빈을 만들지 않아 웹 계층의 JSON 변환 설정에 영향을 주지 않는다.
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** 출고 성공 결과(SUCCEEDED + movements)를 outbox 행으로 만든다. */
+    /** 출고 성공 결과(SUCCEEDED + movements). routing key는 sales 고정(출고는 sales만). */
     public OutboxEvent applied(OutboundResult result) {
         List<Map<String, Object>> movements = result.movements().stream()
-                .map(StockResultEventFactory::movement)
-                .toList();
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sourceRef", result.sourceRef());
-        payload.put("warehouseCode", result.warehouseCode());
-        payload.put("status", "SUCCEEDED");
-        payload.put("movements", movements);
-
-        UUID eventId = UUID.randomUUID();
-        String body = toJson(envelope(eventId, APPLIED_EVENT_TYPE, result.sourceRef(), payload));
-        return OutboxEvent.pending(AGGREGATE_TYPE, result.sourceRef(), APPLIED_EVENT_TYPE, eventId,
-                RabbitTopologyConfig.EVENTS_EXCHANGE, APPLIED_ROUTING_KEY, body);
+                .map(m -> movement(m.sku(), m.delta(), m.currentQuantity())).toList();
+        return appliedEvent(OUTBOUND_AGGREGATE, result.sourceRef(), "inventory.stock.outbound.applied",
+                "inventory.stock.outbound.applied.sales", result.warehouseCode(), movements);
     }
 
-    /** 출고 비즈니스 거절(FAILED + errorCode)을 outbox 행으로 만든다. retryable=false(재시도해도 풀리지 않는 업무 거절). */
+    /** 출고 비즈니스 거절(FAILED + errorCode, retryable=false). */
     public OutboxEvent rejected(OutboundCommand command, BusinessException exception) {
+        return rejectedEvent(OUTBOUND_AGGREGATE, command.sourceRef(), "inventory.stock.outbound.rejected",
+                "inventory.stock.outbound.rejected.sales", command.warehouseCode(), exception);
+    }
+
+    /** 입고 성공 결과. routing key의 상대 도메인은 source(SALES=SO 도착 / PROCUREMENT=PO 입고)로 결정. */
+    public OutboxEvent inboundApplied(InboundResult result, CommandSource source) {
+        List<Map<String, Object>> movements = result.movements().stream()
+                .map(m -> movement(m.sku(), m.delta(), m.currentQuantity())).toList();
+        return appliedEvent(INBOUND_AGGREGATE, result.sourceRef(), "inventory.stock.inbound.applied",
+                "inventory.stock.inbound.applied." + source.suffix(), result.warehouseCode(), movements);
+    }
+
+    /** 입고 비즈니스 거절(INSUFFICIENT_STOCK 없음 — WAREHOUSE_*·ITEM_NOT_FOUND·ITEM_INACTIVE 등). */
+    public OutboxEvent inboundRejected(InboundCommand command, CommandSource source, BusinessException exception) {
+        return rejectedEvent(INBOUND_AGGREGATE, command.sourceRef(), "inventory.stock.inbound.rejected",
+                "inventory.stock.inbound.rejected." + source.suffix(), command.warehouseCode(), exception);
+    }
+
+    // ---- shared builders ----
+
+    private OutboxEvent appliedEvent(String aggregateType, String sourceRef, String eventType, String routingKey,
+                                     String warehouseCode, List<Map<String, Object>> movements) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sourceRef", command.sourceRef());
-        payload.put("warehouseCode", command.warehouseCode());
+        payload.put("sourceRef", sourceRef);
+        payload.put("warehouseCode", warehouseCode);
+        payload.put("status", "SUCCEEDED");
+        payload.put("movements", movements);
+        return build(aggregateType, sourceRef, eventType, routingKey, payload);
+    }
+
+    private OutboxEvent rejectedEvent(String aggregateType, String sourceRef, String eventType, String routingKey,
+                                      String warehouseCode, BusinessException exception) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sourceRef", sourceRef);
+        payload.put("warehouseCode", warehouseCode);
         payload.put("status", "FAILED");
         payload.put("errorCode", exception.getCode());
         payload.put("errorMessage", exception.getMessage());
         payload.put("retryable", false);
-
-        UUID eventId = UUID.randomUUID();
-        String body = toJson(envelope(eventId, REJECTED_EVENT_TYPE, command.sourceRef(), payload));
-        return OutboxEvent.pending(AGGREGATE_TYPE, command.sourceRef(), REJECTED_EVENT_TYPE, eventId,
-                RabbitTopologyConfig.EVENTS_EXCHANGE, REJECTED_ROUTING_KEY, body);
+        return build(aggregateType, sourceRef, eventType, routingKey, payload);
     }
 
-    private static Map<String, Object> movement(OutboundMovement m) {
+    private OutboxEvent build(String aggregateType, String sourceRef, String eventType, String routingKey,
+                              Map<String, Object> payload) {
+        UUID eventId = UUID.randomUUID();
+        String body = toJson(envelope(eventId, eventType, sourceRef, payload));
+        return OutboxEvent.pending(aggregateType, sourceRef, eventType, eventId,
+                RabbitTopologyConfig.EVENTS_EXCHANGE, routingKey, body);
+    }
+
+    private static Map<String, Object> movement(String sku, int delta, int stockAfter) {
         Map<String, Object> mm = new LinkedHashMap<>();
-        mm.put("sku", m.sku());
-        mm.put("quantity", Math.abs(m.delta()));
-        mm.put("delta", m.delta());
-        mm.put("stockAfter", m.currentQuantity());
+        mm.put("sku", sku);
+        mm.put("quantity", Math.abs(delta));
+        mm.put("delta", delta);
+        mm.put("stockAfter", stockAfter);
         return mm;
     }
 

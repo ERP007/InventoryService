@@ -14,6 +14,11 @@ import com.fallguys.inventoryservice.stock.domain.command.OutboundCommand;
 import com.fallguys.inventoryservice.stock.domain.command.OutboundLine;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundResult;
+import com.fallguys.inventoryservice.stock.domain.command.InboundCommand;
+import com.fallguys.inventoryservice.stock.domain.command.InboundLine;
+import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
+import com.fallguys.inventoryservice.stock.domain.query.InboundResult;
+import com.fallguys.inventoryservice.warehouse.domain.exception.WarehouseInactiveException;
 
 class StockResultEventFactoryTest {
 
@@ -57,6 +62,39 @@ class StockResultEventFactoryTest {
         assertThat(payload.get("status").asText()).isEqualTo("FAILED");
         assertThat(payload.get("errorCode").asText()).isEqualTo("INSUFFICIENT_STOCK");
         assertThat(payload.get("errorMessage").asText()).isEqualTo("재고가 부족합니다.");
+        assertThat(payload.get("retryable").asBoolean()).isFalse();
+    }
+
+    @Test
+    void inboundApplied는_source_라우팅키와_SUCCEEDED를_담는다() throws Exception {
+        InboundResult result = new InboundResult("PO-2026-001", "HQ-SE-001",
+                List.of(new InboundMovement(7L, "HMC-EN-00214", 20, 120)));
+
+        OutboxEvent event = factory.inboundApplied(result, CommandSource.PROCUREMENT);
+
+        assertThat(event.getEventType()).isEqualTo("inventory.stock.inbound.applied");
+        assertThat(event.getRoutingKey()).isEqualTo("inventory.stock.inbound.applied.procurement");
+        assertThat(event.getAggregateType()).isEqualTo("STOCK_INBOUND");
+        JsonNode payload = mapper.readTree(event.getPayload()).get("payload");
+        assertThat(payload.get("status").asText()).isEqualTo("SUCCEEDED");
+        JsonNode line = payload.get("movements").get(0);
+        assertThat(line.get("delta").asInt()).isEqualTo(20);   // 입고는 양수
+        assertThat(line.get("quantity").asInt()).isEqualTo(20);
+        assertThat(line.get("stockAfter").asInt()).isEqualTo(120);
+    }
+
+    @Test
+    void inboundRejected는_sales_라우팅키와_FAILED를_담는다() throws Exception {
+        InboundCommand command = new InboundCommand("SO-2026-001", "WH-BR-001",
+                List.of(new InboundLine("HMC-EN-00214", 3, 1)), "E1", "Smoke");
+
+        OutboxEvent event = factory.inboundRejected(command, CommandSource.SALES, new WarehouseInactiveException("WH-BR-001"));
+
+        assertThat(event.getEventType()).isEqualTo("inventory.stock.inbound.rejected");
+        assertThat(event.getRoutingKey()).isEqualTo("inventory.stock.inbound.rejected.sales");
+        JsonNode payload = mapper.readTree(event.getPayload()).get("payload");
+        assertThat(payload.get("status").asText()).isEqualTo("FAILED");
+        assertThat(payload.get("errorCode").asText()).isEqualTo("WAREHOUSE_INACTIVE");
         assertThat(payload.get("retryable").asBoolean()).isFalse();
     }
 
