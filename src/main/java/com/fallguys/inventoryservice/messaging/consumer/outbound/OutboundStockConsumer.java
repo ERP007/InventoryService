@@ -1,4 +1,4 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.outbound;
 
 import java.util.UUID;
 

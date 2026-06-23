@@ -1,4 +1,7 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.inbound;
+
+import com.fallguys.inventoryservice.messaging.consumer.CommandSource;
+import com.fallguys.inventoryservice.messaging.consumer.StockResultEventFactory;
 
 import java.time.Instant;
 import java.util.UUID;

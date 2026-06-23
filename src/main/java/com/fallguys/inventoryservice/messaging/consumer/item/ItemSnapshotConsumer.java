@@ -1,4 +1,4 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.item;
 
 import java.time.Instant;
 import java.util.UUID;

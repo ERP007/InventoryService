@@ -1,4 +1,6 @@
-package com.fallguys.inventoryservice.messaging.consumer;
+package com.fallguys.inventoryservice.messaging.consumer.item;
+
+import com.fallguys.inventoryservice.messaging.consumer.MalformedEventException;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fallguys.inventoryservice.stock.domain.ItemUnit;

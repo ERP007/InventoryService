@@ -42,7 +42,7 @@ spring:
         default-requeue-rejected: false
         retry:
           enabled: true        # 기술 실패는 in-process로 재시도(비즈니스 실패는 예외를 안 던지므로 재시도 대상 아님)
-          max-attempts: 3
+          max-retries: 3
           initial-interval: 1s
           multiplier: 2
           max-interval: 10s
