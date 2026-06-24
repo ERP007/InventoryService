@@ -1,9 +1,12 @@
 package com.fallguys.inventoryservice.stock.infrastructure.persistence;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,14 +16,17 @@ import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Repository;
 
 import com.fallguys.inventoryservice.shared.query.SortDirection;
+import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
+import com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSortField;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.MovementTypeAt;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 import lombok.RequiredArgsConstructor;
@@ -61,6 +67,30 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
     public long countRecent(List<String> warehouseCodes, Instant since) {
         return jpaDao.countRecent(!warehouseCodes.isEmpty(), warehouseCodes, since);
     }
+
+    /**
+     * 기간 [from 00:00, to+1일 00:00) KST의 이동을 (일자 × 유형) 건수로 집계한다.
+     * DB의 시간대 변환 함수에 의존하지 않도록 raw 행(performedAt, type)을 받아 KST 일자로 변환·그룹한다(H2/PostgreSQL 호환).
+     */
+    @Override
+    public List<DailyMovementCount> countDailyByType(List<String> warehouseCodes, LocalDate from, LocalDate to) {
+        Instant fromInstant = from.atStartOfDay(ZONE).toInstant();
+        Instant toExclusive = to.plusDays(1).atStartOfDay(ZONE).toInstant();
+        List<MovementTypeAt> rows = jpaDao.findTypeAndPerformedAt(
+                !warehouseCodes.isEmpty(), warehouseCodes, fromInstant, toExclusive);
+
+        Map<DayType, Long> grouped = new HashMap<>();
+        for (MovementTypeAt row : rows) {
+            LocalDate date = row.performedAt().atZone(ZONE).toLocalDate();
+            grouped.merge(new DayType(date, row.type()), 1L, Long::sum);
+        }
+        return grouped.entrySet().stream()
+                .map(entry -> new DailyMovementCount(entry.getKey().date(), entry.getKey().type(), entry.getValue()))
+                .toList();
+    }
+
+    /** (일자, 유형) 그룹 키. */
+    private record DayType(LocalDate date, MovementType type) {}
 
     @Override
     public StockMovement save(StockMovement movement) {

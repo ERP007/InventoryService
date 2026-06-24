@@ -637,6 +637,12 @@ class StockControllerTest {
                 }
 
                 @Override
+                public List<com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount> countDailyByType(
+                        List<String> warehouseCodes, java.time.LocalDate from, java.time.LocalDate to) {
+                    return List.of();
+                }
+
+                @Override
                 public List<com.fallguys.inventoryservice.stock.domain.query.InboundMovement> findInboundBySourceRefAndWarehouseCode(
                         String sourceRef, String warehouseCode) {
                     return List.of();

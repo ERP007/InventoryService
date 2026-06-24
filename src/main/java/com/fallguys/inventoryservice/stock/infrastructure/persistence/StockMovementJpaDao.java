@@ -13,6 +13,7 @@ import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
+import com.fallguys.inventoryservice.stock.domain.query.MovementTypeAt;
 import com.fallguys.inventoryservice.stock.domain.query.OutboundMovement;
 
 public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, Long> {
@@ -92,6 +93,25 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes,
             @Param("since") Instant since);
+
+    /**
+     * 기간 내 이동의 (발생시각, 유형)만 투영한다(활동 차트 집계용). 조인: WarehouseEntity는 warehouseCodes 필터(테넌시)용.
+     * 일자 그룹·집계는 DB의 시간대 변환 함수 대신 어댑터가 KST로 수행한다(H2/PostgreSQL 모두 호환).
+     * 기간 상한은 종료일+1일 00:00 미만(toExclusive)으로 끝일을 포함한다.
+     */
+    @Query("""
+            SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementTypeAt(m.performedAt, m.type)
+            FROM StockMovementEntity m
+            JOIN WarehouseEntity w ON w.id = m.warehouseId
+            WHERE (:hasWarehouseFilter = FALSE OR w.code IN :warehouseCodes)
+              AND m.performedAt >= :fromInstant
+              AND m.performedAt < :toExclusive
+            """)
+    List<MovementTypeAt> findTypeAndPerformedAt(
+            @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
+            @Param("warehouseCodes") List<String> warehouseCodes,
+            @Param("fromInstant") Instant fromInstant,
+            @Param("toExclusive") Instant toExclusive);
 
     /**
      * (sourceRef × 창고)의 INBOUND 이동 이력을 결과 투영(InboundMovement)으로 조회한다(입고 멱등 replay).

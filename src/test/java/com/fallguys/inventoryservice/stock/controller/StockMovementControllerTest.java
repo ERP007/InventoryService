@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
 import com.fallguys.inventoryservice.stock.domain.StockMovementRepository;
 import com.fallguys.inventoryservice.stock.domain.StockMovementService;
+import com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
@@ -120,6 +122,31 @@ class StockMovementControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void 활동집계는_200과_7일_days와_합계를_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/movements/summary").with(roleJwt(UserRole.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.days.length()").value(7))
+                .andExpect(jsonPath("$.days[0].inbound").value(5))
+                .andExpect(jsonPath("$.days[6].outbound").value(2))
+                .andExpect(jsonPath("$.days[6].adjust").value(3))
+                .andExpect(jsonPath("$.totalInbound").value(5))
+                .andExpect(jsonPath("$.totalOutbound").value(2))
+                .andExpect(jsonPath("$.totalAdjust").value(3));
+    }
+
+    @Test
+    void 활동집계는_가장_낮은_BRANCH_STAFF도_200으로_조회된다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/movements/summary").with(roleJwt(UserRole.BRANCH_STAFF)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 활동집계는_인증토큰이_없으면_401을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/movements/summary"))
+                .andExpect(status().isUnauthorized());
+    }
+
     @TestConfiguration
     static class StubConfig {
 
@@ -147,6 +174,16 @@ class StockMovementControllerTest {
                 @Override
                 public long countRecent(List<String> warehouseCodes, Instant since) {
                     return 0;
+                }
+
+                @Override
+                public List<DailyMovementCount> countDailyByType(
+                        List<String> warehouseCodes, LocalDate from, LocalDate to) {
+                    // from(7일 윈도우 첫날)·to(오늘)에 데이터를 둬 days 양끝에 매핑되게 한다.
+                    return List.of(
+                            new DailyMovementCount(from, MovementType.INBOUND, 5),
+                            new DailyMovementCount(to, MovementType.OUTBOUND, 2),
+                            new DailyMovementCount(to, MovementType.ADJUST, 3));
                 }
 
                 @Override
