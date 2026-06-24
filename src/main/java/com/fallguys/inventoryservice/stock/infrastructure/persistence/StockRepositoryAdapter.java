@@ -49,6 +49,7 @@ public class StockRepositoryAdapter implements StockRepository {
                 query.hasWarehouseFilter(),
                 query.warehouseCodes(),
                 query.status() == null ? null : query.status().name(),
+                query.includeInactive(),
                 pageable);
         return new StockSummaryPage(
                 page.getContent(), query.page(), query.size(), page.getTotalElements(), page.getTotalPages());

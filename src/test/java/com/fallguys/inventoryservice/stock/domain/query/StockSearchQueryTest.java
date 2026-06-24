@@ -79,4 +79,11 @@ class StockSearchQueryTest {
                         .extracting("field")
                         .contains("status", "sort", "page", "size"));
     }
+
+    @Test
+    void includeInactive는_미지정이면_false이고_지정값을_따른다() {
+        assertThat(StockSearchQuery.of(null, null, null, null, null, null).includeInactive()).isFalse();
+        assertThat(StockSearchQuery.of(null, null, null, null, null, null, true).includeInactive()).isTrue();
+        assertThat(StockSearchQuery.of(null, null, null, null, null, null, false).includeInactive()).isFalse();
+    }
 }
