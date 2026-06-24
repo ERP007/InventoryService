@@ -42,3 +42,6 @@ src/main/resources/application.yaml
 .env
 src/main/resources/application-prod.yml
 src/main/resources/application.prod.yml
+
+# 로컬 시드 생성용 임시 입력(Item 마스터 덤프). 결과물 import.sql만 커밋한다.
+items-seed.json
