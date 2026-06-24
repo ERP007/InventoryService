@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.shared.security.JwtClaimExtractor;
 import com.fallguys.inventoryservice.stock.controller.dto.MovementListResponse;
+import com.fallguys.inventoryservice.stock.controller.dto.StockActivityResponse;
 import com.fallguys.inventoryservice.stock.domain.StockMovementService;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
+import com.fallguys.inventoryservice.stock.domain.query.StockActivitySummary;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -71,5 +73,25 @@ public class StockMovementController {
         String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
         MovementSummaryPage result = stockMovementService.search(query, tenancyType, tenancyCode);
         return ResponseEntity.ok(MovementListResponse.from(result));
+    }
+
+    /**
+     * 대시보드 "최근 7일 활동" 차트 데이터를 조회한다. 전 Role 호출 가능하며 집계 범위는 호출자 소속으로 강제된다(BRANCH는 자기 창고).
+     * 최근 7일(KST, 오늘 포함)을 일자별 입고·출고·조정 건수로 집계하고, 이동이 없는 날도 0으로 채워 7개를 반환한다.
+     * 입력 파라미터·창고 코드를 받지 않아 검증 실패(400)·창고 미존재(404)가 없고, 집계 0이어도 200이다.
+     */
+    @Operation(
+            summary = "최근 7일 재고 이동 활동 집계",
+            description = "본사 대시보드 활동 차트용. 최근 7일(KST)을 일자별 입고/출고/조정 건수로 집계해 합계와 함께 반환한다. "
+                    + "집계 범위는 호출자 소속으로 강제(BRANCH는 자기 지점 창고)."
+    )
+    @GetMapping("/summary")
+    public ResponseEntity<StockActivityResponse> summary(@AuthenticationPrincipal Jwt jwt) {
+        TenancyType tenancyType = JwtClaimExtractor.extractTenancyType(jwt);
+        // BRANCH만 자기 창고로 한정하므로 그때만 tenancy_code를 요구한다(ADMIN/HQ는 전사라 불필요).
+        String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;
+        StockActivitySummary summary =
+                stockMovementService.getRecentActivity(tenancyType, tenancyCode, LocalDate.now(ZONE));
+        return ResponseEntity.ok(StockActivityResponse.from(summary));
     }
 }

@@ -275,6 +275,12 @@ class StockOutboundServiceTest {
         public long countRecent(List<String> warehouseCodes, Instant since) {
             return 0;
         }
+
+        @Override
+        public List<com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount> countDailyByType(
+                List<String> warehouseCodes, java.time.LocalDate from, java.time.LocalDate to) {
+            return List.of();
+        }
     }
 
     private static final class StubWarehouseRepository implements WarehouseRepository {

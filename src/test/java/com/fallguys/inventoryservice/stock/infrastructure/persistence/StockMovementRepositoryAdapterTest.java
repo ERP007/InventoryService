@@ -20,6 +20,7 @@ import com.fallguys.inventoryservice.stock.domain.ItemUnit;
 import com.fallguys.inventoryservice.stock.domain.MovementReason;
 import com.fallguys.inventoryservice.stock.domain.MovementType;
 import com.fallguys.inventoryservice.stock.domain.StockMovement;
+import com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
@@ -210,6 +211,40 @@ class StockMovementRepositoryAdapterTest {
         long count = adapter.countRecent(List.of("HQ-001"), since);
 
         assertThat(count).isEqualTo(1); // HQ-001 OUTBOUND 1건
+    }
+
+    @Test
+    void countDailyByType_기간내_일자별_유형별_건수를_집계한다() {
+        List<DailyMovementCount> counts = adapter.countDailyByType(
+                List.of(), LocalDate.of(2026, 5, 15), LocalDate.of(2026, 6, 4));
+
+        // 05-15: INBOUND·OUTBOUND 각 1 / 05-20: INBOUND 1 / 06-03: INBOUND 1 / 06-04: ADJUST 1
+        assertThat(counts).containsExactlyInAnyOrder(
+                new DailyMovementCount(LocalDate.of(2026, 5, 15), MovementType.INBOUND, 1),
+                new DailyMovementCount(LocalDate.of(2026, 5, 15), MovementType.OUTBOUND, 1),
+                new DailyMovementCount(LocalDate.of(2026, 5, 20), MovementType.INBOUND, 1),
+                new DailyMovementCount(LocalDate.of(2026, 6, 3), MovementType.INBOUND, 1),
+                new DailyMovementCount(LocalDate.of(2026, 6, 4), MovementType.ADJUST, 1));
+    }
+
+    @Test
+    void countDailyByType_창고코드_필터는_해당_창고만_집계한다() {
+        List<DailyMovementCount> counts = adapter.countDailyByType(
+                List.of("HQ-001"), LocalDate.of(2026, 5, 1), LocalDate.of(2026, 6, 30));
+
+        // HQ-001은 05-15 OUTBOUND 1건뿐
+        assertThat(counts).containsExactly(
+                new DailyMovementCount(LocalDate.of(2026, 5, 15), MovementType.OUTBOUND, 1));
+    }
+
+    @Test
+    void countDailyByType_기간_밖_이동은_제외한다() {
+        // 06-04만 포함되도록 [06-04, 06-04]로 제한한다(끝일 포함).
+        List<DailyMovementCount> counts = adapter.countDailyByType(
+                List.of(), LocalDate.of(2026, 6, 4), LocalDate.of(2026, 6, 4));
+
+        assertThat(counts).containsExactly(
+                new DailyMovementCount(LocalDate.of(2026, 6, 4), MovementType.ADJUST, 1));
     }
 
     @Test
