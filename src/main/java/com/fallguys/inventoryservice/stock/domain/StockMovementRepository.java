@@ -1,8 +1,10 @@
 package com.fallguys.inventoryservice.stock.domain;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
+import com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount;
 import com.fallguys.inventoryservice.stock.domain.query.InboundMovement;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
@@ -22,6 +24,12 @@ public interface StockMovementRepository {
 
     /** since 이후 이동 건수를 센다(KPI 최근 7일). warehouseCodes가 비어있으면 전사. */
     long countRecent(List<String> warehouseCodes, Instant since);
+
+    /**
+     * 기간(KST 일자 from~to, 양끝 포함) 내 이동을 (일자 × 유형) 건수로 집계한다(대시보드 활동 차트).
+     * warehouseCodes가 비어있으면 전사. 실제 이동이 있는 조합만 반환하며, 빈 날 0채움은 서비스가 담당한다.
+     */
+    List<DailyMovementCount> countDailyByType(List<String> warehouseCodes, LocalDate from, LocalDate to);
 
     /** 신규 이동 이력을 저장하고 식별자·발생시각이 채워진 결과를 반환한다(append-only). */
     StockMovement save(StockMovement movement);

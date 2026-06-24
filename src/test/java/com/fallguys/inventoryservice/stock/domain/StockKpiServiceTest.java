@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
 import com.fallguys.inventoryservice.shared.model.TenancyType;
+import com.fallguys.inventoryservice.stock.domain.query.DailyMovementCount;
 import com.fallguys.inventoryservice.stock.domain.query.MovementHistory;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.MovementSummaryPage;
@@ -159,6 +161,11 @@ class StockKpiServiceTest {
             this.scope = warehouseCodes;
             this.since = since;
             return recentCount;
+        }
+
+        @Override
+        public List<DailyMovementCount> countDailyByType(List<String> warehouseCodes, LocalDate from, LocalDate to) {
+            return List.of();
         }
 
         @Override
