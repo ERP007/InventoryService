@@ -571,9 +571,35 @@ class StockRepositoryAdapterTest {
         assertThat(inactive.itemActive()).isFalse();
     }
 
+    @Test
+    void search_includeInactive_false면_비활성_창고_재고를_제외한다() {
+        insertWarehouse(9L, "WH-OLD-001", "폐쇄 창고", false);
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);  // 활성 창고
+        insertStock("HMC-EN-00214", "엔진오일 필터", 9L, 30, 50);   // 비활성 창고
+
+        StockSummaryPage page = adapter.search(new StockSearchQuery(
+                null, List.of(), null, StockSortField.NAME, SortDirection.ASC, 1, 20, false));
+
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.content()).extracting(StockSummary::warehouseCode).containsExactly("WH-SE-001");
+    }
+
+    @Test
+    void search_includeInactive_false면_비활성_아이템_재고를_제외한다() {
+        insertStock("HMC-EN-00214", "엔진오일 필터", 2L, 120, 50);        // 활성 아이템
+        insertStock("HMC-CL-00222", "클러치 디스크", 2L, 80, 25, false);  // 비활성 아이템
+
+        StockSummaryPage page = adapter.search(new StockSearchQuery(
+                null, List.of(), null, StockSortField.NAME, SortDirection.ASC, 1, 20, false));
+
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.content()).extracting(StockSummary::sku).containsExactly("HMC-EN-00214");
+    }
+
     private static StockSearchQuery query(String keyword, List<String> warehouseCodes, StockStatus status,
                                           StockSortField field, SortDirection direction, int page, int size) {
-        return new StockSearchQuery(keyword, warehouseCodes, status, field, direction, page, size);
+        // 헬퍼는 includeInactive=true(전체 포함)로 둔다 — 기존 비활성 노출 테스트가 toggle ON 동작을 검증한다.
+        return new StockSearchQuery(keyword, warehouseCodes, status, field, direction, page, size, true);
     }
 
     private void seedStocks() {

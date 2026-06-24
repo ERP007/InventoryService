@@ -20,6 +20,7 @@ import com.fallguys.inventoryservice.stock.domain.StockStatus;
  * @param sortDirection  정렬 방향
  * @param page           페이지(1-base)
  * @param size           페이지 크기(20/50/100)
+ * @param includeInactive 비활성(창고/부품) 재고 포함 여부(기본 false = 활성만)
  */
 public record StockSearchQuery(
         String keyword,
@@ -28,7 +29,8 @@ public record StockSearchQuery(
         StockSortField sortField,
         SortDirection sortDirection,
         int page,
-        int size
+        int size,
+        boolean includeInactive
 ) {
 
     private static final StockSortField DEFAULT_FIELD = StockSortField.NAME;
@@ -47,8 +49,14 @@ public record StockSearchQuery(
      *
      * @throws InvalidParameterException status/sort/page/size 중 허용치 밖 값이 있을 때(400, 모든 위반 누적)
      */
+    /** includeInactive 미지정(기본 false = 활성만)으로 조회 조건을 만든다. */
     public static StockSearchQuery of(String keyword, String warehouseCodesCsv, String status,
                                       String sort, Integer page, Integer size) {
+        return of(keyword, warehouseCodesCsv, status, sort, page, size, false);
+    }
+
+    public static StockSearchQuery of(String keyword, String warehouseCodesCsv, String status,
+                                      String sort, Integer page, Integer size, Boolean includeInactive) {
         List<ParameterViolation> violations = new ArrayList<>();
 
         String normalizedKeyword = normalizeKeyword(keyword);
@@ -86,12 +94,13 @@ public record StockSearchQuery(
             throw new InvalidParameterException(violations);
         }
         return new StockSearchQuery(
-                normalizedKeyword, parsedWarehouseCodes, parsedStatus, sortField, sortDirection, parsedPage, parsedSize);
+                normalizedKeyword, parsedWarehouseCodes, parsedStatus, sortField, sortDirection, parsedPage, parsedSize,
+                includeInactive != null && includeInactive);
     }
 
     /** BRANCH 조회 범위 강제용: 창고 필터를 사용자의 단일 창고로 교체한 사본을 만든다. */
     public StockSearchQuery withWarehouseCodes(List<String> codes) {
-        return new StockSearchQuery(keyword, codes, status, sortField, sortDirection, page, size);
+        return new StockSearchQuery(keyword, codes, status, sortField, sortDirection, page, size, includeInactive);
     }
 
     /** 창고 코드 필터가 있는지 여부(없으면 전체 창고). */

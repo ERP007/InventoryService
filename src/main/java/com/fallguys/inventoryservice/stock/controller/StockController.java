@@ -87,9 +87,11 @@ public class StockController {
             @Parameter(description = "페이지(1-base, 기본 1)")
             @RequestParam(required = false) Integer page,
             @Parameter(description = "페이지 크기(20/50/100 중, 기본 20)")
-            @RequestParam(required = false) Integer size
+            @RequestParam(required = false) Integer size,
+            @Parameter(description = "비활성(창고/부품) 재고 포함 여부(기본 false = 활성만)")
+            @RequestParam(required = false) Boolean includeInactive
     ) {
-        StockSearchQuery query = StockSearchQuery.of(keyword, warehouseCodes, status, sort, page, size);
+        StockSearchQuery query = StockSearchQuery.of(keyword, warehouseCodes, status, sort, page, size, includeInactive);
         TenancyType tenancyType = JwtClaimExtractor.extractTenancyType(jwt);
         // BRANCH만 자기 창고로 한정하므로 그때만 tenancy_code를 요구한다(ADMIN/HQ는 전사라 불필요).
         String tenancyCode = tenancyType == TenancyType.BRANCH ? JwtClaimExtractor.extractTenancyCode(jwt) : null;

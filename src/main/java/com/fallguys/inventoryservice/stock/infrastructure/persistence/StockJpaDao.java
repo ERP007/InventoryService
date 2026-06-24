@@ -46,6 +46,7 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
               AND (:status IS NULL
                    OR (:status = 'LOW' AND s.currentStock < s.safetyStock)
                    OR (:status = 'NORMAL' AND s.currentStock >= s.safetyStock))
+              AND (:includeInactive = TRUE OR (w.active = TRUE AND s.itemActive = TRUE))
             """,
             countQuery = """
             SELECT COUNT(s)
@@ -56,12 +57,14 @@ public interface StockJpaDao extends JpaRepository<StockEntity, Long> {
               AND (:status IS NULL
                    OR (:status = 'LOW' AND s.currentStock < s.safetyStock)
                    OR (:status = 'NORMAL' AND s.currentStock >= s.safetyStock))
+              AND (:includeInactive = TRUE OR (w.active = TRUE AND s.itemActive = TRUE))
             """)
     Page<StockSummary> search(
             @Param("keyword") String keyword,
             @Param("hasWarehouseFilter") boolean hasWarehouseFilter,
             @Param("warehouseCodes") List<String> warehouseCodes,
             @Param("status") String status,
+            @Param("includeInactive") boolean includeInactive,
             Pageable pageable);
 
     /** (sku × warehouse) 재고 존재 여부(등록 전 중복 검사). */
