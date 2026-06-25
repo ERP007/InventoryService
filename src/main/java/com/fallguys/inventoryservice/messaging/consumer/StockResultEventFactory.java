@@ -21,13 +21,13 @@ import com.fallguys.inventoryservice.stock.domain.query.OutboundResult;
 /**
  * 출고·입고 결과 이벤트(applied/rejected)를 outbox 행으로 만든다. envelope JSON 전체를 payload에 담고 relay가 그대로 발행한다.
  *
- * <p>outbox 멱등 키 aggregate_id = <b>처리한 명령의 eventId</b>(시도 단위)다. 같은 SO/PO를 재시도하면 새 명령 eventId라
+ * outbox 멱등 키 aggregate_id = 처리한 명령의 eventId(시도 단위)다. 같은 SO/PO를 재시도하면 새 명령 eventId라
  * 별도 결과 행으로 발행돼(실패→재시도 시 클라이언트 폴링이 풀린다), 같은 명령의 중복 수신은 inbox(eventId)가 이미 막는다.
  * (sourceRef로 키잉하면 SO당 결과 1행만 허용돼 재시도 거절이 UNIQUE 충돌로 유실됐다.)
  * correlationId=sourceRef(사가 상관키)는 envelope에 그대로 둔다. eventType은 상대 도메인을 붙이지 않고(스키마 동일),
  * routing key에만 상대 도메인(sales/procurement)을 붙인다.
  *
- * <p>movements는 sku·delta·stockAfter(+quantity=|delta|)만 싣는다. sourceLineNo는 결과 DTO에 아직 없어 생략(명세 #6 보류).
+ * movements는 sku·delta·stockAfter(+quantity=|delta|)만 싣는다. sourceLineNo는 결과 DTO에 아직 없어 생략(명세 #6 보류).
  */
 @Component
 public class StockResultEventFactory {
