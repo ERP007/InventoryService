@@ -1,8 +1,11 @@
 package com.fallguys.inventoryservice.stock.domain;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 import com.fallguys.inventoryservice.stock.domain.command.AdjustStockCommand;
 import com.fallguys.inventoryservice.stock.domain.exception.ItemInactiveException;
 import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundException;
@@ -22,6 +25,10 @@ public class StockAdjustmentService {
     private final StockMovementRepository stockMovementRepository;
     // 같은 inventory 서비스 내 warehouse 애그리거트 참조(창고 활성 여부 검증).
     private final WarehouseRepository warehouseRepository;
+
+    // 사용자 활동 로그 이벤트 발행(선택적 부가 기록). 운영에선 Spring이 outbox 구현체로 주입하고, 미주입(단위 테스트 등)이면 no-op이라 발행을 건너뛴다.
+    @Autowired(required = false)
+    UserActivityRecorder userActivityRecorder = (action, title, content, status) -> { };
 
     /**
      * 재고를 조정하고 이동 이력(append-only) 1건을 남긴다. ADMIN·HQ_MANAGER 전용(인가는 컨트롤러).
@@ -70,8 +77,16 @@ public class StockAdjustmentService {
                 command.note(), command.executorEmpNo(), command.executorName());
         StockMovement saved = stockMovementRepository.save(movement);
 
+        userActivityRecorder.record(
+                UserActivityAction.STOCK_ADJUSTED, stock.getItemName(), command.sku(), signed(delta));
+
         return new StockAdjustmentResult(
                 saved.getId(), stock.getId(), command.sku(), command.warehouseCode(),
                 previousQuantity, delta, stock.getQuantity(), stock.getSafetyStock(), saved.getPerformedAt());
+    }
+
+    /** 변동량을 부호 포함 문자열로 만든다(활동 로그 status). 예: -3, +7. */
+    private static String signed(int delta) {
+        return (delta > 0 ? "+" : "") + delta;
     }
 }
