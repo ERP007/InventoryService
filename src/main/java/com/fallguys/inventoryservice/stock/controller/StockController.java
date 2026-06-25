@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.exception.InvalidParameterException;
 import com.fallguys.inventoryservice.shared.exception.ParameterViolation;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
@@ -171,6 +172,17 @@ public class StockController {
     }
 
     /**
+     * BRANCH는 자기 창고(tenancy_code)의 재고만 수정할 수 있다. 대상 창고가 자기 창고와 다르면 403으로 거부한다.
+     * ADMIN·HQ는 전사 권한이라 검사 없이 통과한다(재고 조정·안전재고 수정 공통).
+     */
+    private static void requireBranchOwnWarehouse(Jwt jwt, String warehouseCode) {
+        if (JwtClaimExtractor.extractTenancyType(jwt) == TenancyType.BRANCH
+                && !JwtClaimExtractor.extractTenancyCode(jwt).equals(warehouseCode)) {
+            throw new ForbiddenException();
+        }
+    }
+
+    /**
      * (sku × warehouse) 재고 행을 신규 생성한다. ADMIN 전용(그 외 Role은 403 FORBIDDEN).
      * 값 검증 실패는 400(INVALID_PARAMETER), 창고 미존재는 404(WAREHOUSE_NOT_FOUND),
      * 재고 중복은 409(STOCK_ALREADY_EXISTS)로 매핑된다.
@@ -208,19 +220,22 @@ public class StockController {
     }
 
     /**
-     * 재고를 조정하고 이동 이력 1건을 남긴다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * 재고를 조정하고 이동 이력 1건을 남긴다. ADMIN·HQ_MANAGER는 전사, BRANCH_MANAGER는 자기 창고만(그 외 Role은 403 FORBIDDEN).
+     * BRANCH_MANAGER가 자기 창고(tenancy_code)가 아닌 창고를 대상으로 하면 403 FORBIDDEN.
      * 형식 오류(reason 누락·증감 ≤0·실사 &lt;0)는 400(INVALID_PARAMETER), 재고 없음은 404(STOCK_NOT_FOUND),
      * 변동 없음은 400(NO_STOCK_CHANGE), 차감 초과는 409(INSUFFICIENT_STOCK)로 매핑된다.
      */
     @Operation(
-            summary = "재고 조정(ADMIN·HQ_MANAGER)",
-            description = "증가/감소/실사보정으로 재고를 보정하고 append-only 이동 이력을 1건 생성한다. 음수 재고는 거부한다."
+            summary = "재고 조정(ADMIN·HQ_MANAGER·BRANCH_MANAGER)",
+            description = "증가/감소/실사보정으로 재고를 보정하고 append-only 이동 이력을 1건 생성한다. 음수 재고는 거부한다. "
+                    + "BRANCH_MANAGER는 자기 지점 창고만 조정할 수 있다."
     )
     @PostMapping("/adjustments")
     public ResponseEntity<StockAdjustmentResponse> adjust(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody StockAdjustmentRequest request) {
-        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.BRANCH_MANAGER);
+        requireBranchOwnWarehouse(jwt, request.warehouseCode());
         String executorEmpNo = JwtClaimExtractor.extractEmployeeNo(jwt);
         String executorName = JwtClaimExtractor.extractName(jwt);
         StockAdjustmentResult result = stockAdjustmentService.adjust(request.toCommand(executorEmpNo, executorName));
@@ -228,12 +243,13 @@ public class StockController {
     }
 
     /**
-     * 안전재고 조정 모달 프리필을 조회한다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * 안전재고 조정 모달 프리필을 조회한다. ADMIN·HQ_MANAGER는 전사, BRANCH_MANAGER는 자기 창고만(그 외 Role은 403 FORBIDDEN).
      * (창고 × 부품)의 현재 안전재고·현재고와 후속 수정용 version을 반환한다. 재고 행이 없으면 404(STOCK_NOT_FOUND).
      */
     @Operation(
-            summary = "안전재고 조정 프리필 조회(ADMIN·HQ_MANAGER)",
-            description = "재고 조회 화면 '안전 재고 조정' 버튼 → 모달 프리필용. (warehouseCode × sku)의 현재 안전재고·현재고·version을 반환한다."
+            summary = "안전재고 조정 프리필 조회(ADMIN·HQ_MANAGER·BRANCH_MANAGER)",
+            description = "재고 조회 화면 '안전 재고 조정' 버튼 → 모달 프리필용. (warehouseCode × sku)의 현재 안전재고·현재고·version을 반환한다. "
+                    + "BRANCH_MANAGER는 자기 지점 창고만 조회할 수 있다."
     )
     @GetMapping("/{warehouseCode}/{sku}/safety-stock")
     public ResponseEntity<SafetyStockEditResponse> safetyStockEdit(
@@ -243,19 +259,21 @@ public class StockController {
             @Parameter(description = "부품 코드 (예: HMC-EN-00214)")
             @PathVariable String sku
     ) {
-        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.BRANCH_MANAGER);
+        requireBranchOwnWarehouse(jwt, warehouseCode);
         SafetyStockEdit edit = stockService.getSafetyStockEdit(warehouseCode, sku);
         return ResponseEntity.ok(SafetyStockEditResponse.from(edit));
     }
 
     /**
-     * 안전재고를 수정한다. ADMIN·HQ_MANAGER 전용(그 외 Role은 403 FORBIDDEN).
+     * 안전재고를 수정한다. ADMIN·HQ_MANAGER는 전사, BRANCH_MANAGER는 자기 창고만(그 외 Role은 403 FORBIDDEN).
      * safetyStock을 절대값으로 교체하며 version으로 낙관적 락을 검증한다(수량·이동 이력은 건드리지 않음).
      * 값 오류(누락·음수)는 400(INVALID_PARAMETER), 재고 행 없음은 404(STOCK_NOT_FOUND), version 불일치는 409(OPTIMISTIC_LOCK_CONFLICT).
      */
     @Operation(
-            summary = "안전재고 수정(ADMIN·HQ_MANAGER)",
-            description = "프리필된 안전재고를 조정한 뒤 최종 저장한다. safetyStock(절대값)·version을 받으며, 동시 수정은 version으로 거부한다."
+            summary = "안전재고 수정(ADMIN·HQ_MANAGER·BRANCH_MANAGER)",
+            description = "프리필된 안전재고를 조정한 뒤 최종 저장한다. safetyStock(절대값)·version을 받으며, 동시 수정은 version으로 거부한다. "
+                    + "BRANCH_MANAGER는 자기 지점 창고만 수정할 수 있다."
     )
     @PatchMapping("/{warehouseCode}/{sku}/safety-stock")
     public ResponseEntity<SafetyStockResponse> updateSafetyStock(
@@ -266,7 +284,8 @@ public class StockController {
             @PathVariable String sku,
             @Valid @RequestBody SafetyStockUpdateRequest request
     ) {
-        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER);
+        JwtClaimExtractor.requireAnyOf(jwt, UserRole.ADMIN, UserRole.HQ_MANAGER, UserRole.BRANCH_MANAGER);
+        requireBranchOwnWarehouse(jwt, warehouseCode);
         SafetyStockEdit updated = stockService.updateSafetyStock(request.toCommand(warehouseCode, sku));
         return ResponseEntity.ok(SafetyStockResponse.from(updated));
     }

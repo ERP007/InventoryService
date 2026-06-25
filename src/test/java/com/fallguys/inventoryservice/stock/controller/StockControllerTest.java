@@ -88,6 +88,16 @@ class StockControllerTest {
         return "ADMIN";
     }
 
+    /** BRANCH_MANAGER JWT(tenancy_code 지정). 자기창고/타창고 강제 검증용. */
+    private static RequestPostProcessor branchManagerJwt(String tenancyCode) {
+        return jwt().jwt(token -> token
+                .claim("employee_no", "br001")
+                .claim("name", "근육맨안승우")
+                .claim("user_role", "BRANCH_MANAGER")
+                .claim("tenancy_type", "BRANCH")
+                .claim("tenancy_code", tenancyCode));
+    }
+
     // ---- GET (목록 조회) : 전체 Role, Tenancy 차등 ----
 
     @Test
@@ -258,7 +268,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("STOCK_ALREADY_EXISTS"));
     }
 
-    // ---- GET/PATCH /{warehouseCode}/{sku}/safety-stock (안전재고 조정) : ADMIN·HQ_MANAGER 전용 ----
+    // ---- GET/PATCH /{warehouseCode}/{sku}/safety-stock (안전재고 조정) : ADMIN·HQ_MANAGER(전사)·BRANCH_MANAGER(자기창고) ----
 
     @Test
     void 안전재고_프리필조회는_200과_현재안전재고_version을_반환한다() throws Exception {
@@ -281,6 +291,23 @@ class StockControllerTest {
         mockMvc.perform(get("/inventory/stocks/WH-SE-001/NO-SUCH/safety-stock").with(roleJwt(UserRole.ADMIN)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
+    }
+
+    @Test
+    void 안전재고_프리필조회_BRANCH_MANAGER_자기창고면_200을_반환한다() throws Exception {
+        // tenancy_code(WH-SE-001) == 대상 창고 → 자기 창고라 허용.
+        mockMvc.perform(get("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.safetyStock").value(50));
+    }
+
+    @Test
+    void 안전재고_프리필조회_BRANCH_MANAGER_타창고면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(get("/inventory/stocks/WH-OTHER-999/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
     }
 
     @Test
@@ -321,14 +348,40 @@ class StockControllerTest {
     }
 
     @Test
-    void 안전재고_수정_BRANCH는_403과_FORBIDDEN을_반환한다() throws Exception {
+    void 안전재고_수정_BRANCH_MANAGER_자기창고면_200으로_갱신된다() throws Exception {
+        // tenancy_code(WH-SE-001) == 대상 창고 → 자기 창고라 허용.
         mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
                         .with(roleJwt(UserRole.BRANCH_MANAGER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"safetyStock":60,"version":3}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.safetyStock").value(60));
+    }
+
+    @Test
+    void 안전재고_수정_BRANCH_MANAGER_타창고면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-OTHER-999/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.BRANCH_MANAGER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":60,"version":3}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 안전재고_수정_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(patch("/inventory/stocks/WH-SE-001/HMC-EN-00214/safety-stock")
+                        .with(roleJwt(UserRole.BRANCH_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"safetyStock":60,"version":3}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
     }
 
     // ---- GET /{sku} (상세 패널) : 전체 Role, Tenancy 차등 ----
@@ -395,7 +448,7 @@ class StockControllerTest {
                 .andExpect(status().isOk());
     }
 
-    // ---- POST /adjustments : ADMIN·HQ_MANAGER 전용 ----
+    // ---- POST /adjustments : ADMIN·HQ_MANAGER(전사)·BRANCH_MANAGER(자기창고) ----
 
     @Test
     void 조정은_200과_변동전후_상태_이동식별자를_반환한다() throws Exception {
@@ -430,12 +483,38 @@ class StockControllerTest {
     }
 
     @Test
-    void 조정은_권한없는_BRANCH_MANAGER면_403과_FORBIDDEN을_반환한다() throws Exception {
+    void 조정_BRANCH_MANAGER가_자기_창고면_200으로_조정된다() throws Exception {
+        // tenancy_code == 대상 창고(WH-SE-002) → 자기 창고라 허용.
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(branchManagerJwt("WH-SE-002"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warehouseCode").value("WH-SE-002"));
+    }
+
+    @Test
+    void 조정_BRANCH_MANAGER가_타_창고면_403과_FORBIDDEN을_반환한다() throws Exception {
+        // tenancy_code(WH-SE-001) != 대상 창고(WH-SE-002) → 자기 창고 아님.
         mockMvc.perform(post("/inventory/stocks/adjustments")
                         .with(roleJwt(UserRole.BRANCH_MANAGER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-002","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+    }
+
+    @Test
+    void 조정_BRANCH_STAFF면_403과_FORBIDDEN을_반환한다() throws Exception {
+        mockMvc.perform(post("/inventory/stocks/adjustments")
+                        .with(roleJwt(UserRole.BRANCH_STAFF))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"HMC-EN-00214","warehouseCode":"WH-SE-001","adjustmentType":"DECREASE","quantity":3,"reason":"DAMAGE"}
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));

@@ -58,7 +58,8 @@ class StockMovementRepositoryAdapterTest {
         insertMovement("HMC-EN-00214", "엔진오일 필터", 5L, -40, "OUTBOUND", null, "SO-1", 1, 460, instant("2026-05-15"));
         insertMovement("HMC-BR-00788", "브레이크 패드", 2L, 60, "INBOUND", null, "SO-2", 1, 60, instant("2026-05-20"));
         insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, 30, "INBOUND", null, "SO-3", 1, 70, instant("2026-06-03"));
-        insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, -5, "ADJUST", "DAMAGE", null, null, 65, instant("2026-06-04"));
+        insertMovement("HMC-EN-00214", "엔진오일 필터", 2L, -5, "ADJUST", "DAMAGE", null, null, 65,
+                "유리 파손으로 3개 폐기", instant("2026-06-04"));
     }
 
     @Test
@@ -170,6 +171,19 @@ class StockMovementRepositoryAdapterTest {
         MovementSummary row = page.content().get(0);
         assertThat(row.executorEmpNo()).isEqualTo("HMC0001");
         assertThat(row.executorName()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void note는_조정_메모를_투영하고_입출고는_null이다() {
+        MovementSummaryPage page = adapter.search(query(null, List.of(), null,
+                WIDE_FROM, WIDE_TO, MovementSortField.OCCURRED_AT, SortDirection.DESC, 1, 20));
+
+        MovementSummary adjust = page.content().stream()
+                .filter(m -> m.type() == MovementType.ADJUST).findFirst().orElseThrow();
+        assertThat(adjust.note()).isEqualTo("유리 파손으로 3개 폐기");
+        assertThat(page.content()).filteredOn(m -> m.type() == MovementType.INBOUND)
+                .isNotEmpty()
+                .allMatch(m -> m.note() == null);
     }
 
     @Test
@@ -309,6 +323,12 @@ class StockMovementRepositoryAdapterTest {
 
     private void insertMovement(String sku, String itemName, long warehouseId, int delta, String type, String reason,
             String sourceRef, Integer sourceLineNo, int stockAfter, Instant performedAt) {
+        insertMovement(sku, itemName, warehouseId, delta, type, reason, sourceRef, sourceLineNo, stockAfter,
+                null, performedAt);
+    }
+
+    private void insertMovement(String sku, String itemName, long warehouseId, int delta, String type, String reason,
+            String sourceRef, Integer sourceLineNo, int stockAfter, String note, Instant performedAt) {
         // 오일류는 L, 그 외는 EA로 단위를 스냅샷한다(테스트 시드용 단순 파생).
         String itemUnit = itemName.contains("오일") && !itemName.contains("필터") ? "L" : "EA";
         entityManager().createNativeQuery("""
@@ -327,7 +347,7 @@ class StockMovementRepositoryAdapterTest {
                 .setParameter(8, sourceRef)
                 .setParameter(9, sourceLineNo)
                 .setParameter(10, stockAfter)
-                .setParameter(11, null)
+                .setParameter(11, note)
                 .setParameter(12, "HMC0001")
                 .setParameter(13, "홍길동")
                 .setParameter(14, performedAt)

@@ -23,6 +23,7 @@ public record MovementSummary(
         MovementReason reason,
         String sourceRef,
         String executorEmpNo,
-        String executorName
+        String executorName,
+        String note
 ) {
 }

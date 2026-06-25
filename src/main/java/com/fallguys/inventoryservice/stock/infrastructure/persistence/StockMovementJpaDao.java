@@ -32,7 +32,7 @@ public interface StockMovementJpaDao extends JpaRepository<StockMovementEntity, 
     @Query(value = """
             SELECT new com.fallguys.inventoryservice.stock.domain.query.MovementSummary(
                 m.id, m.performedAt, m.sku, m.itemName, m.itemUnit, w.code, w.name,
-                m.delta, m.type, m.reason, m.sourceRef, m.executorEmpNo, m.executorName)
+                m.delta, m.type, m.reason, m.sourceRef, m.executorEmpNo, m.executorName, m.note)
             FROM StockMovementEntity m
             JOIN WarehouseEntity w ON w.id = m.warehouseId
             WHERE (:keyword IS NULL OR LOWER(m.itemName) LIKE :keyword OR LOWER(m.sku) LIKE :keyword)
