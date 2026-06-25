@@ -5,9 +5,12 @@ import com.fallguys.inventoryservice.branchlocation.domain.BranchLocationReposit
 import java.util.List;
 
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.CreateWarehouseCommand;
 import com.fallguys.inventoryservice.warehouse.domain.command.UpdateWarehouseCommand;
@@ -31,6 +34,10 @@ public class WarehouseService {
     private final WarehouseRepository warehouseRepository;
     // 같은 inventory 서비스 내 다른 애그리거트(BranchLocation) 참조 무결성 확인용
     private final BranchLocationRepository branchLocationRepository;
+
+    // 사용자 활동 로그 이벤트 발행(선택적 부가 기록). 운영에선 Spring이 outbox 구현체로 주입하고, 미주입(단위 테스트 등)이면 no-op이라 발행을 건너뛴다.
+    @Autowired(required = false)
+    UserActivityRecorder userActivityRecorder = (action, title, content, status) -> { };
 
     /**
      * 창고 목록을 조회한다.
@@ -118,8 +125,10 @@ public class WarehouseService {
         }
         Long id = warehouseRepository.save(warehouse);
 
-        return warehouseRepository.findSummaryById(id)
+        WarehouseSummary summary = warehouseRepository.findSummaryById(id)
                 .orElseThrow(() -> new IllegalStateException("저장된 창고를 조회하지 못했습니다: " + id));
+        userActivityRecorder.record(UserActivityAction.WAREHOUSE_CREATED, summary.name(), summary.code(), null);
+        return summary;
     }
 
     /**
@@ -169,7 +178,9 @@ public class WarehouseService {
                 throw new BranchAlreadyAssignedException(command.branchId());
             }
         }
-        return warehouseRepository.update(code, command);
+        WarehouseSummaryForEdit updated = warehouseRepository.update(code, command);
+        userActivityRecorder.record(UserActivityAction.WAREHOUSE_UPDATED, updated.name(), updated.code(), null);
+        return updated;
     }
 
     /**
@@ -201,6 +212,9 @@ public class WarehouseService {
                 && warehouseRepository.findActiveHq().size() <= 1) {
             throw new LastActiveHqWarehouseException(code);
         }
-        return warehouseRepository.changeActive(code, command);
+        WarehouseSummaryForEdit changed = warehouseRepository.changeActive(code, command);
+        userActivityRecorder.record(UserActivityAction.WAREHOUSE_STATUS_CHANGED,
+                changed.name(), changed.code(), changed.active() ? "active" : "inactive");
+        return changed;
     }
 }

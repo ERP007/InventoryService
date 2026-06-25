@@ -20,6 +20,8 @@ import com.fallguys.inventoryservice.stock.domain.exception.StockNotFoundExcepti
 import com.fallguys.inventoryservice.stock.domain.query.ItemInfo;
 import com.fallguys.inventoryservice.stock.domain.query.ItemStockRow;
 import com.fallguys.inventoryservice.stock.domain.query.SafetyStockEdit;
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 import com.fallguys.inventoryservice.stock.domain.query.StockCreateResult;
 import com.fallguys.inventoryservice.stock.domain.query.StockDetail;
 import com.fallguys.inventoryservice.stock.domain.query.StockQuantity;
@@ -361,6 +363,39 @@ class StockServiceTest {
 
         assertThat(rows).isEmpty();
         assertThat(stockRepository.itemStocksQueried).isTrue();
+    }
+
+    @Test
+    void updateSafetyStock_성공시_SAFETY_STOCK_UPDATED_활동을_발행한다() {
+        StubStockRepository stockRepository = new StubStockRepository();
+        // 수정 전 안전재고 50(findBySkuAndWarehouseCode가 반환) → 60으로 변경 → status "+10".
+        stockRepository.skuStock = Stock.of(1L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 120, 50);
+        StockService service = new StockService(stockRepository, new StubWarehouseRepository(2L), ITEM_NOOP);
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.updateSafetyStock(new UpdateSafetyStockCommand("WH-SE-001", "HMC-EN-00214", 60, 3L));
+
+        assertThat(recorder.action).isEqualTo(UserActivityAction.SAFETY_STOCK_UPDATED);
+        assertThat(recorder.title).isEqualTo("엔진오일 필터");
+        assertThat(recorder.content).isEqualTo("HMC-EN-00214");
+        assertThat(recorder.status).isEqualTo("+10");
+    }
+
+    /** record 인자를 포착하는 테스트용 recorder. */
+    private static final class CapturingRecorder implements UserActivityRecorder {
+        private UserActivityAction action;
+        private String title;
+        private String content;
+        private String status;
+
+        @Override
+        public void record(UserActivityAction action, String title, String content, String status) {
+            this.action = action;
+            this.title = title;
+            this.content = content;
+            this.status = status;
+        }
     }
 
     private static final class StubStockRepository implements StockRepository {
