@@ -71,3 +71,15 @@ inventory:
       poll-interval-ms: ${INVENTORY_MESSAGING_RELAY_POLL_INTERVAL_MS:1000}
       batch-size: ${INVENTORY_MESSAGING_RELAY_BATCH_SIZE:100}
       confirm-timeout-ms: ${INVENTORY_MESSAGING_RELAY_CONFIRM_TIMEOUT_MS:5000}
+    # inbox 하우스키핑: 매일 새벽 4시(KST)에 보존 기간(3일) 지난 PROCESSED inbox 행 삭제. async-enabled=false면 무동작.
+    # 보존 기간은 브로커 재전달/DLQ 윈도우보다 길게 둔다(짧으면 재전달 시 dedup 누락 위험).
+    inbox-cleanup:
+      cron: ${INVENTORY_MESSAGING_INBOX_CLEANUP_CRON:0 0 4 * * *}
+      zone: ${INVENTORY_MESSAGING_INBOX_CLEANUP_ZONE:Asia/Seoul}
+      retention-days: ${INVENTORY_MESSAGING_INBOX_CLEANUP_RETENTION_DAYS:3}
+    # outbox 하우스키핑: 매일 새벽 4시(KST)에 보존 기간(3일) 지난 PUBLISHED outbox 행 삭제. async-enabled=false면 무동작.
+    # PENDING(미발행)은 정리 대상이 아니다(발행 전 행 삭제는 이벤트 유실).
+    outbox-cleanup:
+      cron: ${INVENTORY_MESSAGING_OUTBOX_CLEANUP_CRON:0 0 4 * * *}
+      zone: ${INVENTORY_MESSAGING_OUTBOX_CLEANUP_ZONE:Asia/Seoul}
+      retention-days: ${INVENTORY_MESSAGING_OUTBOX_CLEANUP_RETENTION_DAYS:3}
