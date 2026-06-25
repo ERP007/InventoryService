@@ -25,6 +25,8 @@ import com.fallguys.inventoryservice.stock.domain.query.StockSearchQuery;
 import com.fallguys.inventoryservice.stock.domain.query.StockSkuRow;
 import com.fallguys.inventoryservice.stock.domain.query.StockStatusCount;
 import com.fallguys.inventoryservice.stock.domain.query.StockSummaryPage;
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 import com.fallguys.inventoryservice.warehouse.domain.Warehouse;
 import com.fallguys.inventoryservice.warehouse.domain.WarehouseRepository;
 import com.fallguys.inventoryservice.warehouse.domain.command.ChangeWarehouseActiveCommand;
@@ -138,6 +140,55 @@ class StockAdjustmentServiceTest {
                 .isInstanceOf(ItemInactiveException.class);
         assertThat(stockRepo.savedQuantity).isNull();
         assertThat(movementRepo.saved).isNull();
+    }
+
+    // ---- 사용자 활동 이벤트 발행 ----
+
+    @Test
+    void 조정_성공시_STOCK_ADJUSTED_활동을_발행한다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
+        StockAdjustmentService service =
+                new StockAdjustmentService(stockRepo, new StubMovementRepository(), new StubWarehouseRepository());
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.adjust(command(AdjustmentType.DECREASE, 3));
+
+        assertThat(recorder.action).isEqualTo(UserActivityAction.STOCK_ADJUSTED);
+        assertThat(recorder.title).isEqualTo("엔진오일 필터"); // 부품 이름
+        assertThat(recorder.content).isEqualTo("HMC-EN-00214"); // sku
+        assertThat(recorder.status).isEqualTo("-3");
+    }
+
+    @Test
+    void 조정_증가시_활동_status는_양수부호를_포함한다() {
+        StubStockRepository stockRepo = new StubStockRepository();
+        stockRepo.stock = Stock.of(1001L, "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA, 2L, 51, 50);
+        StockAdjustmentService service =
+                new StockAdjustmentService(stockRepo, new StubMovementRepository(), new StubWarehouseRepository());
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.adjust(command(AdjustmentType.INCREASE, 7));
+
+        assertThat(recorder.status).isEqualTo("+7");
+    }
+
+    /** record 인자를 포착하는 테스트용 recorder. */
+    private static final class CapturingRecorder implements UserActivityRecorder {
+        private UserActivityAction action;
+        private String title;
+        private String content;
+        private String status;
+
+        @Override
+        public void record(UserActivityAction action, String title, String content, String status) {
+            this.action = action;
+            this.title = title;
+            this.content = content;
+            this.status = status;
+        }
     }
 
     private static final class StubStockRepository implements StockRepository {

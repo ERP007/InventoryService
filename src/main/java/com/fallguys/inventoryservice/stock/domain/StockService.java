@@ -1,5 +1,6 @@
 package com.fallguys.inventoryservice.stock.domain;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,6 +8,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 import com.fallguys.inventoryservice.shared.exception.ForbiddenException;
 import com.fallguys.inventoryservice.shared.model.TenancyType;
 import com.fallguys.inventoryservice.stock.domain.command.CreateStockCommand;
@@ -41,6 +44,10 @@ public class StockService {
     private final WarehouseRepository warehouseRepository;
     // [DIP] Item 마스터 조회(sku 존재 검증·빈 stock의 기본 안전재고). 통합 비활성이면 검증을 건너뛴다.
     private final ItemInfoProvider itemInfoProvider;
+
+    // 사용자 활동 로그 이벤트 발행(선택적 부가 기록). 운영에선 Spring이 outbox 구현체로 주입하고, 미주입(단위 테스트 등)이면 no-op이라 발행을 건너뛴다.
+    @Autowired(required = false)
+    UserActivityRecorder userActivityRecorder = (action, title, content, status) -> { };
 
     /**
      * 재고 목록을 조회한다. Tenancy에 따라 조회 범위가 다르다.
@@ -231,11 +238,18 @@ public class StockService {
                     throw new WarehouseInactiveException(command.warehouseCode());
                 });
         // 비활성 부품(SKU)의 재고도 수정할 수 없다. 재고 행이 있을 때만 검사하고, 행 미존재(404)는 영속 계층이 판정한다.
-        stockRepository.findBySkuAndWarehouseCode(command.sku(), command.warehouseCode())
-                .filter(stock -> !stock.isItemActive())
-                .ifPresent(stock -> {
-                    throw new ItemInactiveException(command.sku());
-                });
-        return stockRepository.updateSafetyStock(command);
+        // 활동 로그 status(증감)를 위해 수정 전 안전재고도 함께 잡아둔다.
+        Stock existing = stockRepository.findBySkuAndWarehouseCode(command.sku(), command.warehouseCode())
+                .orElse(null);
+        if (existing != null && !existing.isItemActive()) {
+            throw new ItemInactiveException(command.sku());
+        }
+        SafetyStockEdit updated = stockRepository.updateSafetyStock(command);
+
+        int delta = updated.safetyStock() - (existing != null ? existing.getSafetyStock() : updated.safetyStock());
+        userActivityRecorder.record(
+                UserActivityAction.SAFETY_STOCK_UPDATED, updated.itemName(), updated.sku(),
+                (delta > 0 ? "+" : "") + delta);
+        return updated;
     }
 }

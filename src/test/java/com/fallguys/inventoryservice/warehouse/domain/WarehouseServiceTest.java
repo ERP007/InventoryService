@@ -28,6 +28,8 @@ import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseOption;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSearchQuery;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummary;
 import com.fallguys.inventoryservice.warehouse.domain.query.WarehouseSummaryForEdit;
+import com.fallguys.inventoryservice.shared.activity.UserActivityAction;
+import com.fallguys.inventoryservice.shared.activity.UserActivityRecorder;
 
 class WarehouseServiceTest {
 
@@ -348,6 +350,92 @@ class WarehouseServiceTest {
 
         assertThat(result.active()).isTrue();
         assertThat(repository.changeActiveCalled).isTrue();
+    }
+
+    // ---- 사용자 활동 이벤트 발행 ----
+
+    @Test
+    void create는_WAREHOUSE_CREATED_활동을_발행한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryAfterSave = summary(24L, "WH-SE-002"); // name "서울 2창고"
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.create(new CreateWarehouseCommand("WH-SE-002", "서울 2창고", WarehouseType.DEALER, 3L, "서울 강남구"));
+
+        assertThat(recorder.count).isEqualTo(1);
+        assertThat(recorder.action).isEqualTo(UserActivityAction.WAREHOUSE_CREATED);
+        assertThat(recorder.title).isEqualTo("서울 2창고");
+        assertThat(recorder.content).isEqualTo("WH-SE-002");
+        assertThat(recorder.status).isNull();
+    }
+
+    @Test
+    void update는_WAREHOUSE_UPDATED_활동을_발행한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.updatedResult = new WarehouseSummaryForEdit(
+                2L, "WH-SE-001", "서울 1창고 (강남)", WarehouseType.DEALER, 3L, "서울 강남지점", "새 주소",
+                true, Instant.parse("2024-03-10T09:00:00Z"), Instant.parse("2026-05-28T14:31:00Z"), 6L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.update("WH-SE-001",
+                new UpdateWarehouseCommand("서울 1창고 (강남)", WarehouseType.DEALER, 3L, "새 주소", 5L));
+
+        assertThat(recorder.action).isEqualTo(UserActivityAction.WAREHOUSE_UPDATED);
+        assertThat(recorder.title).isEqualTo("서울 1창고 (강남)");
+        assertThat(recorder.content).isEqualTo("WH-SE-001");
+        assertThat(recorder.status).isNull();
+    }
+
+    @Test
+    void changeActive_상태가_바뀌면_WAREHOUSE_STATUS_CHANGED_활동을_발행한다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEdit(true, 6L);
+        repository.changeActiveResult = forEdit(false, 7L); // active=false → status "inactive"
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.changeActive("WH-SE-001", new ChangeWarehouseActiveCommand(false, 6L));
+
+        assertThat(recorder.action).isEqualTo(UserActivityAction.WAREHOUSE_STATUS_CHANGED);
+        assertThat(recorder.title).isEqualTo("서울 1창고");
+        assertThat(recorder.content).isEqualTo("WH-SE-001");
+        assertThat(recorder.status).isEqualTo("inactive");
+    }
+
+    @Test
+    void changeActive_no_op이면_활동을_발행하지_않는다() {
+        StubWarehouseRepository repository = new StubWarehouseRepository(List.of());
+        repository.summaryForEdit = forEdit(true, 6L);
+        WarehouseService service = new WarehouseService(repository, new StubBranchLocationRepository(true));
+        CapturingRecorder recorder = new CapturingRecorder();
+        service.userActivityRecorder = recorder;
+
+        service.changeActive("WH-SE-001", new ChangeWarehouseActiveCommand(true, 6L)); // 같은 값 → no-op
+
+        assertThat(recorder.count).isZero();
+    }
+
+    /** record 인자를 포착하는 테스트용 recorder. */
+    private static final class CapturingRecorder implements UserActivityRecorder {
+        private UserActivityAction action;
+        private String title;
+        private String content;
+        private String status;
+        private int count;
+
+        @Override
+        public void record(UserActivityAction action, String title, String content, String status) {
+            this.action = action;
+            this.title = title;
+            this.content = content;
+            this.status = status;
+            this.count++;
+        }
     }
 
     private static final class StubWarehouseRepository implements WarehouseRepository {
