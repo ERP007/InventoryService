@@ -11,6 +11,7 @@ import com.fallguys.inventoryservice.stock.domain.query.MovementSummary;
  * 재고 이동 이력 목록 항목. type·reason·unit은 코드(enum name)로 노출하고 한글 라벨은 프론트가 매핑한다.
  * unit은 이동 이력 자체 스냅샷(item_unit)에서 가져온다.
  * sourceRef는 원천 참조가 없는 조정 행이면 'ADJ-{id}'로 합성한다.
+ * note는 조정 시 입력한 메모(입고·출고는 null). 프론트는 비어있지 않을 때만 메모 보기 버튼을 노출한다.
  */
 public record MovementResponse(
         Long id,
@@ -25,7 +26,8 @@ public record MovementResponse(
         MovementReason reason,
         String sourceRef,
         String executorEmpNo,
-        String executorName
+        String executorName,
+        String note
 ) {
 
     public static MovementResponse from(MovementSummary summary) {
@@ -43,6 +45,7 @@ public record MovementResponse(
                 summary.reason(),
                 sourceRef,
                 summary.executorEmpNo(),
-                summary.executorName());
+                summary.executorName(),
+                summary.note());
     }
 }

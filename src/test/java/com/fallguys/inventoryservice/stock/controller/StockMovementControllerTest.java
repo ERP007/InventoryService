@@ -1,5 +1,6 @@
 package com.fallguys.inventoryservice.stock.controller;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -75,8 +76,10 @@ class StockMovementControllerTest {
                 .andExpect(jsonPath("$.content[0].sourceRef").value("ADJ-88231"))
                 .andExpect(jsonPath("$.content[0].executorEmpNo").value("HMC2001"))
                 .andExpect(jsonPath("$.content[0].executorName").value("김재고"))
+                .andExpect(jsonPath("$.content[0].note").value("유리 파손으로 3개 폐기"))
                 .andExpect(jsonPath("$.content[1].type").value("INBOUND"))
                 .andExpect(jsonPath("$.content[1].sourceRef").value("SO-202605-00001"))
+                .andExpect(jsonPath("$.content[1].note").value(nullValue()))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.totalElements").value(2))
@@ -158,11 +161,11 @@ class StockMovementControllerTest {
                     MovementSummary adjust = new MovementSummary(
                             88231L, Instant.parse("2026-05-28T14:35:00Z"), "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA,
                             "WH-SE-001", "서울 1창고", -3, MovementType.ADJUST, MovementReason.DAMAGE, null,
-                            "HMC2001", "김재고");
+                            "HMC2001", "김재고", "유리 파손으로 3개 폐기");
                     MovementSummary inbound = new MovementSummary(
                             88230L, Instant.parse("2026-05-20T14:22:00Z"), "HMC-EN-00214", "엔진오일 필터", ItemUnit.EA,
                             "WH-SE-001", "서울 1창고", 40, MovementType.INBOUND, null, "SO-202605-00001",
-                            "HMC2001", "김재고");
+                            "HMC2001", "김재고", null);
                     return new MovementSummaryPage(List.of(adjust, inbound), query.page(), query.size(), 2, 1);
                 }
 
