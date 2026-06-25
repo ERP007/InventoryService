@@ -55,14 +55,14 @@ public class InboundStockProcessorImpl implements InboundStockProcessor {
     @Transactional
     public void applySuccess(EventEnvelope envelope, InboundCommand command, CommandSource source) {
         InboundResult result = stockInboundService.inbound(command); // REQUIRED → 이 트랜잭션에 합류
-        outboxDao.save(eventFactory.inboundApplied(result, source));
+        outboxDao.save(eventFactory.inboundApplied(envelope.eventId(), result, source));
         inboxDao.save(processedInbox(envelope, command.sourceRef()));
     }
 
     @Override
     @Transactional
     public void recordRejection(EventEnvelope envelope, InboundCommand command, CommandSource source, BusinessException exception) {
-        outboxDao.save(eventFactory.inboundRejected(command, source, exception));
+        outboxDao.save(eventFactory.inboundRejected(envelope.eventId(), command, source, exception));
         inboxDao.save(processedInbox(envelope, command.sourceRef()));
     }
 

@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
  * RabbitMQ로 발행한다. Publisher Confirm ack(브로커 수신 확정)를 받은 뒤에만 PUBLISHED로 전환한다(유실 방지).
  * payload는 발행할 이벤트 envelope JSON 전체이며 relay가 거의 그대로 body로 보낸다.
  *
- * <p>멱등: UNIQUE(aggregate_type, aggregate_id, event_type)로 같은 비즈니스 결과의 재발행을 1행으로 막는다.
+ * 멱등: UNIQUE(aggregate_type, aggregate_id, event_type)로 같은 비즈니스 결과의 재발행을 1행으로 막는다.
  * 예) 출고 결과 = (STOCK_OUTBOUND, sourceRef, inventory.stock.outbound.applied). 재처리 시 ON CONFLICT DO NOTHING.
  * 결과 그레인은 (방향 × sourceRef)이며 창고는 그 안에서 1개로 결정된다(필요 시 warehouse를 키에 추가).
  */
