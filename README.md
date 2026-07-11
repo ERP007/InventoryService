@@ -135,8 +135,3 @@ DIP 인터페이스를 In-memory Fake로 대체한 서비스 단위 테스트 + 
 ## CI/CD
 
 `Jenkinsfile` 파이프라인: 비-`main` 브랜치는 Docker 빌드로 PR 게이트, `main`은 이미지 빌드 → Harbor Registry 푸시 → SSH `docker compose up -d --no-deps` 무중단 재배포 → 헬스체크. `Dockerfile`은 `gradle:8-jdk21-alpine` → `eclipse-temurin:21-jre-alpine` 멀티스테이지입니다.
-
-## 추가 문서
-
-- [`CLAUDE.md`](./CLAUDE.md) — 아키텍처 원칙 · 네이밍 · 예외/트랜잭션 컨벤션
-- [`HELP.md`](./HELP.md) — Spring Boot 레퍼런스 링크
