@@ -1,3 +1,7 @@
+[시연영상](https://drive.google.com/file/d/1AAngRPcylW3r3TqIOwVdt2s0ZwCmyaZZ/view?usp=sharing) <br/>
+[발표자료](https://drive.google.com/drive/folders/1qfJdUXn3QTCwlzC5YHjtakLO0uI1XSbk?usp=sharing)
+
+
 # Inventory Service
 
 > MSA 기반 자동차 부품 유통 ERP의 **재고(Inventory) 마이크로서비스**. 창고·재고 관리와 입출고 이력을 담당하며, **트랜잭션 아웃박스 패턴**으로 구매(Procurement)·판매(Sales) 서비스와 이벤트 기반으로 연동합니다.
